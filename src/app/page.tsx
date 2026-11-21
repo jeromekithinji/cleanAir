@@ -1,5 +1,5 @@
-import { Planner } from "@/components/planner"
+import { MapScreen } from "@/components/map-screen"
 
 export default function Home() {
-  return <Planner />
+  return <MapScreen />
 }
