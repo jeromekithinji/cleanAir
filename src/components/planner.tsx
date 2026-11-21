@@ -76,11 +76,7 @@ export function Planner() {
               Edit profile
             </button>
           </div>
-          <ConditionsBanner
-            origin={origin}
-            profile={profile}
-            poorAir={poorAir}
-          />
+          <ConditionsBanner origin={origin} />
           <div className="grid gap-6 md:grid-cols-2">
             <section className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
               <TripSearch

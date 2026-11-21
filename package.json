@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "api": "uvicorn app.main:app --reload --port 8000 --app-dir backend"
+    "api": "uvicorn main:app --reload --port 8000 --app-dir backend"
   },
   "dependencies": {
     "next": "16.4.6",

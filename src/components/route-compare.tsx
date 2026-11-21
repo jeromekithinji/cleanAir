@@ -1,5 +1,8 @@
 import type { RouteOption } from "@/lib/types"
 
+// Task A fills this from POST /api/route. The tradeoff sentence is built
+// in backend/routing.py.
+
 interface RouteCompareProps {
   tradeoff: string | null
   routes: RouteOption[]

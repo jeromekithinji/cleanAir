@@ -40,6 +40,13 @@ __pycache__/
 .venv/
 venv/
 
+# Task A map import and Task B air database (download locally, do not commit)
+backend/graphhopper/*.jar
+backend/graphhopper/*.pbf
+backend/graphhopper/graph-cache/
+backend/data/*.sqlite
+backend/data/*.csv
+
 # vercel
 .vercel
 

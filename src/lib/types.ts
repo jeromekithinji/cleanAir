@@ -21,6 +21,17 @@ export interface GeocodeResponse {
   results: Place[]
 }
 
+export interface AirSnapshot {
+  station_id: number | null
+  station_name: string
+  neighbourhood: string
+  lat: number
+  lon: number
+  iqa: number | null
+  level: AirCategory
+  observed_at: string | null
+}
+
 export interface AirReading {
   station_name: string
   neighbourhood: string

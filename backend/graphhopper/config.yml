@@ -1,0 +1,25 @@
+# Task A. Two profiles on a Montréal extract.
+# Start from backend/graphhopper after the jar and montreal.osm.pbf are in
+# this folder. Steps are in the README under "Task A — routing".
+# Contraction hierarchies stay off so /api/route can send a custom model.
+
+graphhopper:
+  datareader.file: montreal.osm.pbf
+  graph.location: graph-cache
+  profiles:
+    - name: bike
+      custom_model_files: [bike.json]
+    - name: foot
+      custom_model_files: [foot.json]
+  profiles_ch: []
+  profiles_lm: []
+
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: localhost
+  admin_connectors:
+    - type: http
+      port: 8990
+      bind_host: localhost

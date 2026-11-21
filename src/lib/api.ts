@@ -1,5 +1,6 @@
 import type {
   AssistantResponse,
+  AirSnapshot,
   ConditionsResponse,
   GeocodeResponse,
   HealthProfile,
@@ -73,6 +74,14 @@ export function getHealth(): Promise<{ status: string }> {
   return request("/health")
 }
 
+export function getAir(place: Place): Promise<AirSnapshot> {
+  const params = new URLSearchParams({
+    lat: String(place.lat),
+    lon: String(place.lon),
+  })
+  return request(`/api/air?${params.toString()}`)
+}
+
 export function geocode(query: string): Promise<GeocodeResponse> {
   const params = new URLSearchParams({ q: query })
   return request(`/geocode?${params.toString()}`)
@@ -100,7 +109,7 @@ export function planRoutes(
   profile: HealthProfile,
   poorAir: boolean,
 ): Promise<RoutesResponse> {
-  return request("/routes", {
+  return request("/api/route", {
     method: "POST",
     body: JSON.stringify({
       origin,

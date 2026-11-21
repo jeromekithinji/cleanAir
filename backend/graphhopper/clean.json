@@ -1,0 +1,20 @@
+{
+  "priority": [
+    {
+      "if": "road_class == MOTORWAY || road_class == TRUNK",
+      "multiply_by": "0.05"
+    },
+    {
+      "if": "road_class == PRIMARY",
+      "multiply_by": "0.3"
+    },
+    {
+      "if": "road_class == RESIDENTIAL || road_class == LIVING_STREET",
+      "multiply_by": "1.4"
+    },
+    {
+      "if": "road_class == CYCLEWAY || road_environment == CYCLEWAY",
+      "multiply_by": "2"
+    }
+  ]
+}

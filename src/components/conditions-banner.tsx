@@ -1,17 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { featureMessage, getConditions } from "@/lib/api"
-import type {
-  ConditionsResponse,
-  HealthProfile,
-  Place,
-} from "@/lib/types"
+import { featureMessage, getAir } from "@/lib/api"
+import type { AirSnapshot, Place } from "@/lib/types"
 
 interface ConditionsBannerProps {
   origin: Place | null
-  profile: HealthProfile
-  poorAir: boolean
 }
 
 const CATEGORY_CLASS: Record<string, string> = {
@@ -21,12 +15,8 @@ const CATEGORY_CLASS: Record<string, string> = {
   unknown: "border-zinc-200 bg-zinc-50 text-zinc-700",
 }
 
-export function ConditionsBanner({
-  origin,
-  profile,
-  poorAir,
-}: ConditionsBannerProps) {
-  const [conditions, setConditions] = useState<ConditionsResponse | null>(null)
+export function ConditionsBanner({ origin }: ConditionsBannerProps) {
+  const [air, setAir] = useState<AirSnapshot | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -34,23 +24,23 @@ export function ConditionsBanner({
       return
     }
     let cancelled = false
-    getConditions(origin, profile, poorAir)
+    getAir(origin)
       .then((next) => {
         if (!cancelled) {
-          setConditions(next)
+          setAir(next)
           setMessage(null)
         }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setConditions(null)
+          setAir(null)
           setMessage(featureMessage(error))
         }
       })
     return () => {
       cancelled = true
     }
-  }, [origin, profile, poorAir])
+  }, [origin])
 
   if (!origin) {
     return (
@@ -68,7 +58,7 @@ export function ConditionsBanner({
     )
   }
 
-  if (!conditions) {
+  if (!air) {
     return (
       <p className="rounded-xl border border-zinc-200 px-4 py-3 text-sm">
         Checking the nearest station…
@@ -76,17 +66,17 @@ export function ConditionsBanner({
     )
   }
 
-  const tone = CATEGORY_CLASS[conditions.air.category] ?? CATEGORY_CLASS.unknown
+  const tone = CATEGORY_CLASS[air.level] ?? CATEGORY_CLASS.unknown
 
   return (
     <div className={`rounded-xl border px-4 py-3 text-sm ${tone}`}>
-      <p className="font-medium">{conditions.banner}</p>
+      <p className="font-medium">
+        {air.level} air
+        {air.neighbourhood ? ` in ${air.neighbourhood}` : ""}
+      </p>
       <p>
-        {conditions.air.station_name}
-        {conditions.air.neighbourhood
-          ? ` · ${conditions.air.neighbourhood}`
-          : ""}
-        {conditions.air.iqa !== null ? ` · IQA ${conditions.air.iqa}` : ""}
+        {air.station_name}
+        {air.iqa !== null ? ` · IQA ${air.iqa}` : ""}
       </p>
     </div>
   )

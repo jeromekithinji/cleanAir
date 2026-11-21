@@ -1,7 +1,7 @@
-"""Tailpipe CO₂ of driving the same distance.
+"""CO2 of driving the same distance.
 
-Walking and biking count as 0 g for the trip. The driving figure is the
-US EPA average gasoline car: 404 g/mile, which is 251 g/km.
+Walking and biking count as 0 g. Driving uses 251 g/km
+(US EPA average gasoline car, 404 g per mile).
 """
 
 CAR_G_PER_KM = 251

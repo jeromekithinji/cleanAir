@@ -1,13 +1,18 @@
-"""Request and response contracts.
-
-Keep these stable so each feature can land in its own change without
-breaking the Next.js client.
-"""
+"""Shared request and response shapes. The web app expects these fields."""
 
 from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+
+class FeatureNotReady(Exception):
+    def __init__(self, feature: str, filename: str) -> None:
+        self.feature = feature
+        self.module = filename
+        super().__init__(
+            f"{feature} is not implemented yet. Start in {filename}."
+        )
 
 
 class Sensitivity(str, Enum):
@@ -86,10 +91,24 @@ class RoutesResponse(BaseModel):
     routes: list[RouteOption]
 
 
+class AirResponse(BaseModel):
+    station_id: int | None = None
+    station_name: str
+    neighbourhood: str
+    lat: float
+    lon: float
+    iqa: int | None = None
+    level: AirCategory
+    observed_at: str | None = None
+
+
 class RoutesRequest(BaseModel):
     origin: Place
     destination: Place
     profile: HealthProfile
+    # Filled from /api/air. "poor" selects clean-strict.json.
+    air_level: AirCategory | None = None
+    # Checkbox override so routing can be tested before air data is loaded.
     poor_air: bool = False
 
 
