@@ -18,7 +18,7 @@ import type { HeatGrid } from "@/lib/heat-grid"
 import { toScenario, type LiveConditions } from "@/lib/live-view"
 import { answerMessage } from "@/lib/clair-assistant"
 import { kgSaved } from "@/lib/impact"
-import { pairFromResponse, type RouteId, type RoutePair } from "@/lib/routing"
+import { formatMinutes, pairFromResponse, type RouteId, type RoutePair } from "@/lib/routing"
 import type { Sensitivity } from "@/lib/types"
 import { AirQualityCard } from "./AirQualityCard"
 import { ChatAssistant, type ChatMessage } from "./ChatAssistant"
@@ -468,7 +468,7 @@ export function App() {
         currentLocation={CURRENT_LOCATION}
         label={
           routes && dest
-            ? `Map of Montréal showing a fastest route (${routes.fast.minutes} min) and a cleaner-air route (${routes.clean.minutes} min) to ${dest.name}.`
+            ? `Map of Montréal showing a fastest route (${formatMinutes(routes.fast.minutes)}) and a cleaner-air route (${formatMinutes(routes.clean.minutes)}) to ${dest.name}.`
             : "Map of Montréal."
         }
         exposureOn={exposureOn}

@@ -213,9 +213,18 @@ export function buildRoutes(
   }
 }
 
+/** 45 → "45 min", 60 → "1 h", 75 → "1 h 15 min". */
+export function formatMinutes(total: number): string {
+  const minutes = Math.round(total)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`
+}
+
 export function tradeoffLine(fast: RouteOption, clean: RouteOption): string {
   const extra = clean.minutes - fast.minutes
-  const time = extra <= 0 ? "No extra time" : `+${extra} min`
+  const time = extra <= 0 ? "No extra time" : `+${formatMinutes(extra)}`
   if (fast.busy < 0.05) {
     return `${time}. Both routes already avoid busy roads.`
   }
