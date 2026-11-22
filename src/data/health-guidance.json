@@ -1,0 +1,189 @@
+[
+  {
+    "id": "aqhi-low",
+    "requires": ["air:good"],
+    "boosts": ["activity:exercise", "activity:outdoor"],
+    "text": "When air quality is in the low-risk range, everyone, including people with health conditions, can enjoy their usual outdoor activities.",
+    "source": "Environment and Climate Change Canada / Health Canada: Air Quality Health Index",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index/about.html"
+  },
+  {
+    "id": "aqhi-moderate-at-risk",
+    "requires": ["air:acceptable"],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd", "activity:exercise"],
+    "text": "At moderate risk, people with health conditions should consider cutting back or rescheduling strenuous outdoor activity if they notice symptoms such as coughing or throat irritation. Others can usually keep up their normal activities unless they have symptoms.",
+    "source": "Environment and Climate Change Canada / Health Canada: Air Quality Health Index",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index/about.html"
+  },
+  {
+    "id": "aqhi-high-at-risk",
+    "requires": ["air:poor"],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd", "activity:exercise"],
+    "text": "At high risk, people with health conditions should cut back or reschedule strenuous outdoor activity. Everyone else should consider doing the same if they have symptoms like coughing or throat irritation.",
+    "source": "Environment and Climate Change Canada / Health Canada: Air Quality Health Index",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index/about.html"
+  },
+  {
+    "id": "aqhi-very-high-at-risk",
+    "requires": ["aqhi:very-high"],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd", "activity:exercise"],
+    "text": "At very high risk, people with health conditions should avoid strenuous outdoor activity, and everyone should cut back or reschedule it.",
+    "source": "Environment and Climate Change Canada / Health Canada: Air Quality Health Index",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index/about.html"
+  },
+  {
+    "id": "who-is-at-risk-air",
+    "requires": [],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd", "air:acceptable", "air:poor"],
+    "text": "People more vulnerable to air pollution include children, adults over 65, people with conditions such as asthma, COPD, heart disease or diabetes, and active people who exercise or work hard outdoors.",
+    "source": "Environment and Climate Change Canada / Health Canada",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index/about.html"
+  },
+  {
+    "id": "ozone-what",
+    "requires": ["pollutant:o3"],
+    "boosts": ["heat:hot", "heat:warning", "activity:exercise"],
+    "text": "Ground-level ozone is a main part of smog. It forms when pollutants react in heat and sunlight, so it tends to build up on hot, sunny days, usually peaking from midday to early evening.",
+    "source": "Public Health Agency of Canada; Government of Ontario air quality report",
+    "url": "https://www.canada.ca/en/public-health/services/health-promotion/environmental-public-health-climate-change/climate-change-public-health-factsheets-air.html"
+  },
+  {
+    "id": "ozone-effects",
+    "requires": ["pollutant:o3"],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd"],
+    "text": "Ozone can cause coughing, eye, nose and throat irritation, chest discomfort, shortness of breath and reduced lung function. It can affect healthy people and people with asthma or COPD.",
+    "source": "Health Canada: Ozone",
+    "url": "https://www.canada.ca/en/health-canada/services/air-quality/indoor-air-contaminants/ozone.html"
+  },
+  {
+    "id": "ozone-indoors",
+    "requires": ["pollutant:o3"],
+    "boosts": ["air:acceptable", "air:poor", "topic:places"],
+    "text": "Most ozone indoors comes from outside, and indoor levels are generally lower than outdoor levels, so indoor activities are a reasonable alternative on high-ozone days.",
+    "source": "Health Canada: Ozone",
+    "url": "https://www.canada.ca/en/health-canada/services/air-quality/indoor-air-contaminants/ozone.html"
+  },
+  {
+    "id": "pm25-active",
+    "requires": ["pollutant:pm25"],
+    "boosts": ["activity:exercise", "air:acceptable", "air:poor"],
+    "text": "Fine particles (PM2.5) are a key outdoor pollutant, and wildfire smoke is a major source. People who are physically active outdoors breathe in more fine particles when air quality is poor and should watch closely for symptoms.",
+    "source": "Gouvernement du Québec: Preventing the effects of wildfire smoke",
+    "url": "https://www.quebec.ca/sante/conseils-et-prevention/sante-et-environnement/prevenir-effets-exposition-fumee-feux-foret"
+  },
+  {
+    "id": "no2-busy-roads",
+    "requires": ["pollutant:no2"],
+    "boosts": ["topic:routes", "activity:commute"],
+    "text": "Nitrogen dioxide comes largely from traffic. It affects health directly and also helps form ozone and fine particles. People near busy roadways are among those more exposed to air pollution.",
+    "source": "Environment and Climate Change Canada / Health Canada",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/air-quality-health-index/publications.html"
+  },
+  {
+    "id": "avoid-busy-roads",
+    "requires": [],
+    "boosts": ["topic:routes", "activity:commute", "air:acceptable", "air:poor", "pollutant:no2"],
+    "text": "To reduce exposure, avoid busy roads and industrial areas when you walk, bike or exercise outdoors.",
+    "source": "Gouvernement du Québec: Preventing the health effects of air pollution",
+    "url": "https://www.quebec.ca/en/health/advice-and-prevention/health-and-environment/preventing-the-health-effects-of-air-pollution"
+  },
+  {
+    "id": "exercise-breathing",
+    "requires": ["activity:exercise"],
+    "boosts": ["air:acceptable", "air:poor"],
+    "text": "When air quality is poor, limit or reduce physical activity: breathing faster and more deeply during exercise brings more pollutants into your lungs.",
+    "source": "Gouvernement du Québec: Preventing the health effects of air pollution",
+    "url": "https://www.quebec.ca/en/health/advice-and-prevention/health-and-environment/preventing-the-health-effects-of-air-pollution"
+  },
+  {
+    "id": "walk-bike-good-air",
+    "requires": ["air:good"],
+    "boosts": ["topic:routes", "activity:commute"],
+    "text": "When air quality is good, walking or biking is encouraged, and it also helps keep the air cleaner for everyone.",
+    "source": "Gouvernement du Québec: Preventing the health effects of air pollution",
+    "url": "https://www.quebec.ca/en/health/advice-and-prevention/health-and-environment/preventing-the-health-effects-of-air-pollution"
+  },
+  {
+    "id": "carry-medication",
+    "requires": [],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd", "air:acceptable", "air:poor"],
+    "text": "People with heart or breathing conditions should carry their medication when going outdoors and follow their doctor's instructions for keeping symptoms under control.",
+    "source": "Gouvernement du Québec: Preventing the health effects of air pollution",
+    "url": "https://www.quebec.ca/en/health/advice-and-prevention/health-and-environment/preventing-the-health-effects-of-air-pollution"
+  },
+  {
+    "id": "symptoms-stay-indoors",
+    "requires": [],
+    "boosts": ["air:poor", "sensitivity:asthma", "sensitivity:copd"],
+    "alwaysIf": ["air:poor"],
+    "text": "Pay attention to symptoms while outdoors. If you have trouble breathing, go indoors. For health questions, call Info-Santé at 811.",
+    "source": "Gouvernement du Québec: Preventing the health effects of air pollution",
+    "url": "https://www.quebec.ca/en/health/advice-and-prevention/health-and-environment/preventing-the-health-effects-of-air-pollution"
+  },
+  {
+    "id": "info-smog-warning",
+    "requires": ["air:poor"],
+    "boosts": ["topic:forecast"],
+    "text": "In Québec, the Info-Smog program forecasts air quality as good, acceptable or poor, and a smog warning is issued when poor air quality is expected. Checking the forecast helps you plan outdoor activities.",
+    "source": "Environment and Climate Change Canada: Info-Smog",
+    "url": "https://www.canada.ca/en/environment-climate-change/services/info-smog.html"
+  },
+  {
+    "id": "heat-who-at-risk",
+    "requires": ["heat:warning"],
+    "boosts": ["sensitivity:asthma", "sensitivity:copd", "sensitivity:heat"],
+    "text": "Extreme heat is riskiest for older adults, young children and people with chronic illnesses such as breathing or heart problems.",
+    "source": "Health Canada: Extreme heat, who is at risk",
+    "url": "https://www.canada.ca/en/health-canada/services/climate-change-health/extreme-heat/who-is-at-risk.html"
+  },
+  {
+    "id": "heat-active",
+    "requires": ["heat:warning"],
+    "boosts": ["activity:exercise", "sensitivity:asthma", "sensitivity:copd", "sensitivity:heat"],
+    "alwaysIf": ["heat:warning"],
+    "text": "Being active in extreme heat carries risk even for healthy people, and more so for people with breathing difficulties. If you must be active, take extra breaks, drink plenty of water, and don't expect your usual performance.",
+    "source": "Health Canada: Protect yourself from extreme heat",
+    "url": "https://www.canada.ca/en/health-canada/services/climate-change-health/extreme-heat/how-protect-yourself.html"
+  },
+  {
+    "id": "heat-timing",
+    "requires": ["heat:hot"],
+    "boosts": ["activity:exercise", "activity:outdoor", "topic:forecast"],
+    "text": "In hot weather, plan outdoor activities before 10 a.m. or after 4 p.m., when the heat is less intense.",
+    "source": "Gouvernement du Québec: Preventing the effects of oppressive and extreme heat",
+    "url": "https://www.quebec.ca/en/health/advice-and-prevention/health-and-environment/preventing-the-effects-of-oppressive-and-extreme-heat"
+  },
+  {
+    "id": "heat-hydration",
+    "requires": ["heat:hot"],
+    "boosts": ["activity:exercise", "sensitivity:heat"],
+    "text": "Drink plenty of water before you feel thirsty, and limit alcohol, very sugary drinks and high-caffeine drinks, which can dehydrate you.",
+    "source": "Ville de Montréal, with Santé publique de Montréal: Heat wave tips",
+    "url": "https://montreal.ca/articles/comment-se-proteger-durant-une-canicule-5120"
+  },
+  {
+    "id": "heat-cool-places",
+    "requires": ["heat:warning"],
+    "boosts": ["topic:places", "sensitivity:heat"],
+    "text": "During a heat wave, spend a few hours a day somewhere cool or air-conditioned. In Montréal, pools, libraries, shaded parks and air-conditioned public places may have extended hours, so check schedules before going.",
+    "source": "Ville de Montréal, with Santé publique de Montréal: Heat wave tips",
+    "url": "https://montreal.ca/articles/comment-se-proteger-durant-une-canicule-5120"
+  },
+  {
+    "id": "heat-clothing",
+    "requires": ["heat:hot"],
+    "boosts": ["activity:outdoor", "activity:commute"],
+    "text": "Wear light-coloured, lightweight, loose clothing and a breathable wide-brimmed hat in the heat.",
+    "source": "Ville de Montréal; Gouvernement du Québec",
+    "url": "https://montreal.ca/articles/comment-se-proteger-durant-une-canicule-5120"
+  },
+  {
+    "id": "heat-symptoms",
+    "requires": ["heat:warning"],
+    "boosts": ["sensitivity:heat", "activity:exercise"],
+    "alwaysIf": ["heat:warning"],
+    "text": "Watch for fatigue, dry mouth, red or tingling skin, headache, dizziness or confusion. If you have these symptoms, call Info-Santé at 811 or see a health professional. If they come with a fever, it may be heat stroke: call 911.",
+    "source": "Ville de Montréal, with Santé publique de Montréal: Heat wave tips",
+    "url": "https://montreal.ca/articles/comment-se-proteger-durant-une-canicule-5120"
+  }
+]

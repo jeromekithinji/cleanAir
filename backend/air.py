@@ -179,7 +179,7 @@ async def nearest_station(lat: float, lon: float) -> AirResponse:
         rows = db.execute(
             """
             SELECT s.station_id, s.name, s.neighbourhood, s.latitude, s.longitude,
-                   r.iqa, r.observed_at
+                   r.iqa, r.pollutant, r.observed_at
             FROM stations s
             JOIN readings r ON r.station_id = s.station_id
             """
@@ -201,7 +201,16 @@ async def nearest_station(lat: float, lon: float) -> AirResponse:
             level=AirCategory.unknown,
         )
 
-    station_id, name, neighbourhood, station_lat, station_lon, iqa, observed_at = best
+    (
+        station_id,
+        name,
+        neighbourhood,
+        station_lat,
+        station_lon,
+        iqa,
+        pollutant,
+        observed_at,
+    ) = best
     return AirResponse(
         station_id=station_id,
         station_name=name,
@@ -210,6 +219,7 @@ async def nearest_station(lat: float, lon: float) -> AirResponse:
         lon=station_lon,
         iqa=iqa,
         level=level_for(iqa),
+        pollutant=pollutant,
         observed_at=observed_at,
     )
 

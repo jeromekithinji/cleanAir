@@ -1,28 +1,34 @@
-import { levelForIndex, trendText, weatherAdvice, windNote, type Scenario } from "@/data/mock"
+import { levelForIndex, weatherAdvice, windNote } from "@/data/mock"
+import type { LiveConditions } from "@/lib/live-view"
 import {
   AtomIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ClockIcon,
+  CloudIcon,
   SunIcon,
   ThermometerIcon,
-  TrendDownIcon,
-  TrendUpIcon,
   WindIcon,
 } from "./icons"
 
 type WeatherCardProps = {
-  scenario: Scenario
+  live: LiveConditions | null
   open: boolean
   onToggle: () => void
 }
 
-const BARS = [4, 7, 10, 13, 16, 20]
-
-export function WeatherCard({ scenario, open, onToggle }: WeatherCardProps) {
-  const level = levelForIndex(scenario.index)
-  const hotter = scenario.feels - scenario.temp >= 3
-  const trend = scenario.index > scenario.previous ? "up" : scenario.index < scenario.previous ? "down" : "steady"
+export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
+  const level = live?.index == null ? "unknown" : levelForIndex(live.index)
+  const temp = live?.tempC == null ? null : Math.round(live.tempC)
+  const feels = live?.feelsC == null ? null : Math.round(live.feelsC)
+  const wind = live?.windKmh == null ? null : Math.round(live.windKmh)
+  const hotter = temp != null && feels != null && feels - temp >= 3
+  const source =
+    live?.weatherSource === "live"
+      ? "Open-Meteo · live"
+      : live?.weatherSource === "stored"
+        ? "Open-Meteo · Montréal"
+        : "Weather unavailable"
   return (
     <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather and timing">
       <div className="widget-head">
@@ -38,58 +44,60 @@ export function WeatherCard({ scenario, open, onToggle }: WeatherCardProps) {
           {open ? <ChevronDownIcon size={20} /> : <ChevronUpIcon size={20} />}
         </button>
       </div>
-      <p className="widget-sub">Environment Canada · Montréal</p>
-      <p className="weather-advice">{weatherAdvice(level)}</p>
-      {open && (
+      <p className="widget-sub">{live ? source : "Loading the latest forecast…"}</p>
+      <p className="weather-advice">
+        {level === "unknown" ? "Waiting for a live reading" : weatherAdvice(level)}
+      </p>
+      {open && live && (
         <>
           <div className="tiles">
             <div className="tile">
               <div className="tile-label">
                 <SunIcon size={16} />
-                {scenario.sky}
+                {live.sky}
               </div>
-              <div className="tile-value">{scenario.temp}°C</div>
-              <div className={`tile-note${hotter ? " is-hot" : ""}`}>Feels like {scenario.feels}°</div>
+              <div className="tile-value">{temp == null ? "—" : `${temp}°C`}</div>
+              <div className={`tile-note${hotter ? " is-hot" : ""}`}>
+                {feels == null ? "Feels like —" : `Feels like ${feels}°`}
+              </div>
             </div>
             <div className="tile">
               <div className="tile-label">
                 <WindIcon size={16} />
                 Wind
               </div>
-              <div className="tile-value">{scenario.wind} km/h</div>
-              <div className="tile-note">{windNote(scenario.wind)}</div>
+              <div className="tile-value">{wind == null ? "—" : `${wind} km/h`}</div>
+              <div className="tile-note">{wind == null ? "No wind reading" : windNote(wind)}</div>
             </div>
           </div>
           <div className="weather-rows">
             <div className="weather-row">
               <AtomIcon size={18} />
               <span className="weather-row-label">Main pollutant</span>
-              <span className="weather-row-value is-strong">{scenario.pollutant}</span>
+              <span className="weather-row-value is-strong">{live.pollutant}</span>
             </div>
             <div className="weather-row">
-              {trend === "down" ? <TrendDownIcon size={18} /> : <TrendUpIcon size={18} />}
-              <span className="weather-row-label">Trend</span>
+              <CloudIcon size={18} />
+              <span className="weather-row-label">Rain chance</span>
               <span className="weather-row-value">
-                <span className={`bars bars-${trend}`} aria-hidden="true">
-                  {BARS.map((h, i) => (
-                    <span key={i} style={{ height: h }} />
-                  ))}
-                </span>
-                {trendText(scenario.index, scenario.previous)}
+                {live.rainChance == null ? "—" : `${Math.round(live.rainChance)}%`}
               </span>
             </div>
             <div className="weather-row">
               <ClockIcon size={18} />
               <span className="weather-row-label">Best time to go</span>
-              <span className="weather-row-value is-best">{scenario.best}</span>
+              <span className="weather-row-value is-best">{live.bestTime}</span>
             </div>
           </div>
-          {scenario.heatWarning && (
+          {live.heatWarning && (
             <p className="heat-banner">
               <ThermometerIcon size={20} />
               Heat warning in effect today
             </p>
           )}
+          {live.weatherUpdatedLabel ? (
+            <p className="widget-updated">Last updated {live.weatherUpdatedLabel}</p>
+          ) : null}
         </>
       )}
     </section>

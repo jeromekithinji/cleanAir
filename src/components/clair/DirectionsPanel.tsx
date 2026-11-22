@@ -9,13 +9,17 @@ type DirectionsPanelProps = {
   top: number
   mode: Mode
   onMode: (mode: Mode) => void
-  airLevel: AirLevel
-  airIndex: number
+  airLevel: AirLevel | "unknown"
+  airIndex: number | null
   routes: RoutePair | null
   selected: RouteId
   onSelect: (id: RouteId) => void
   tradeoff: string
   explanations: string[]
+  suggestMetro: boolean
+  loading: boolean
+  loadingLabel?: string
+  error: string | null
   tripActive: boolean
   onTrip: () => void
   onClear: () => void
@@ -49,19 +53,28 @@ export function DirectionsPanel(props: DirectionsPanelProps) {
       {routes ? (
         <>
           <div className="route-cards">
-            <RouteCard route={routes.fast} selected={selected === "fast"} onSelect={() => props.onSelect("fast")} />
-            <RouteCard route={routes.clean} selected={selected === "clean"} onSelect={() => props.onSelect("clean")} />
+            <RouteCard route={routes.fast} selected={selected === "fast"} onSelect={() => props.onSelect("fast")} showBusy={mode === "bike"} />
+            <RouteCard route={routes.clean} selected={selected === "clean"} onSelect={() => props.onSelect("clean")} showBusy={mode === "bike"} />
           </div>
           <p className="tradeoff">{props.tradeoff}</p>
-          <ul className="why">
-            {props.explanations.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+          {props.suggestMetro ? (
+            <p className="air-line air-poor">Air is poor, so the metro is a better trip today.</p>
+          ) : null}
+          {props.explanations.length > 0 ? (
+            <ul className="why">
+              {props.explanations.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : null}
           <button type="button" className="btn-primary" onClick={props.onTrip}>
             {props.tripActive ? "Finish trip" : "Start trip"}
           </button>
         </>
+      ) : props.loading ? (
+        <p className="directions-empty">{props.loadingLabel ?? "Finding the fastest and cleaner routes…"}</p>
+      ) : props.error ? (
+        <p className="directions-empty">{props.error}</p>
       ) : (
         <p className="directions-empty">Pick a different start and destination.</p>
       )}

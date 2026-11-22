@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { APP_NAME } from "@/data/mock"
-import type { ChatChip } from "@/lib/assistant"
+import type { ChatChip } from "@/lib/clair-assistant"
 import { ChatSparkIcon, CloseIcon, SendIcon } from "./icons"
 
 export type ChatMessage = {

@@ -45,6 +45,14 @@ from settings import CLEAN_MODEL, CLEAN_STRICT_MODEL, get_settings
 GRAPHHOPPER_PROFILE = {TravelMode.bike: "bike", TravelMode.walk: "foot"}
 
 
+class RoutingUnavailable(Exception):
+    """GraphHopper did not return a route. The request should fail."""
+
+    def __init__(self, detail: str) -> None:
+        self.detail = detail
+        super().__init__(detail)
+
+
 async def fetch_route(
     origin: Place, destination: Place, profile: str, model_file: Path | None = None
 ) -> dict:
@@ -60,10 +68,21 @@ async def fetch_route(
         body["custom_model"] = json.loads(model_file.read_text())
 
     url = f"{get_settings().graphhopper_url}/route"
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(url, json=body)
-    response.raise_for_status()
-    return response.json()["paths"][0]
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(url, json=body)
+    except httpx.HTTPError as exc:
+        raise RoutingUnavailable(
+            "GraphHopper is not running. Start it on port 8989."
+        ) from exc
+    if response.status_code >= 400:
+        raise RoutingUnavailable(
+            f"GraphHopper rejected the route ({response.status_code})."
+        )
+    paths = response.json().get("paths") or []
+    if not paths:
+        raise RoutingUnavailable("GraphHopper did not return a route.")
+    return paths[0]
 # Agreed with the team: these road types count as busy.
 BUSY_ROADS = {"motorway", "trunk", "primary", "secondary"}
 
@@ -78,13 +97,22 @@ def segment_meters(a: list[float], b: list[float]) -> float:
 def busy_share(path: dict) -> float:
     """Fraction of the route (0 to 1) that is on busy roads."""
     coords = path["points"]["coordinates"]
+    last = len(coords) - 1
     busy = total = 0.0
     for start, end, road_class in path["details"]["road_class"]:
-        meters = sum(segment_meters(coords[i], coords[i + 1]) for i in range(start, end))
+        meters = 0.0
+        for index in range(start, end):
+            if index < 0 or index >= last:
+                continue
+            meters += segment_meters(coords[index], coords[index + 1])
         total += meters
-        if road_class.lower() in BUSY_ROADS:
+        if str(road_class).lower() in BUSY_ROADS:
             busy += meters
-    return busy / total if total > 0 else 0.0
+    if total <= 0:
+        return 0.0
+    return min(1.0, busy / total)
+
+
 async def air_level_for(request: RoutesRequest) -> AirCategory:
     """The air level at the trip origin. Uses what the page sent if it sent one."""
     if request.poor_air:
@@ -123,16 +151,28 @@ def route_option(route_id: str, label: str, path: dict) -> RouteOption:
     )
 
 
-def tradeoff_text(fast: RouteOption, clean: RouteOption) -> str:
+def format_minutes(total: int) -> str:
+    """45 -> "45 min", 60 -> "1 h", 75 -> "1 h 15 min"."""
+    if total < 60:
+        return f"{total} min"
+    hours, rest = divmod(total, 60)
+    return f"{hours} h" if rest == 0 else f"{hours} h {rest} min"
+
+
+def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> str:
     """One line comparing the two routes, e.g. "+3 min, 69% less on busy roads"."""
     extra = round((clean.duration_seconds - fast.duration_seconds) / 60)
     if extra > 0:
-        time_part = f"+{extra} min"
+        time_part = f"+{format_minutes(extra)}"
     elif extra < 0:
-        time_part = f"{extra} min"  # the clean route is faster: "-2 min"
+        time_part = f"-{format_minutes(-extra)}"  # the clean route is faster: "-2 min"
     else:
         time_part = "Same time"
 
+    if mode == TravelMode.walk:
+        # Sidewalks are mapped as "footway", so busy streets can't be measured
+        # for walking. Don't show a misleading 0%.
+        return f"{time_part}, quieter streets"
     if fast.busy_share == 0:
         busy_part = "both routes avoid busy roads"
     else:
@@ -155,7 +195,7 @@ async def plan_routes(request: RoutesRequest) -> RoutesResponse:
     clean = route_option("clean", "Cleaner air", clean_path)
 
     return RoutesResponse(
-        tradeoff=tradeoff_text(fast, clean),
+        tradeoff=tradeoff_text(fast, clean,request.profile.mode),
         suggest_metro=level == AirCategory.poor,
         routes=[fast, clean],
     )

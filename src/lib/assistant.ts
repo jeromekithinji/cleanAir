@@ -1,301 +1,554 @@
+import OpenAI from "openai"
+import { z } from "zod"
+import type { Place } from "@/lib/types"
 import {
-  DESTINATIONS,
-  FORECAST,
-  type ForecastId,
-  type Health,
-  type Mode,
-  type Place,
-  type Scenario,
-  detectPlace,
-  highestLevel,
-  levelForIndex,
-  levelLabel,
-  LEVEL_LABEL,
-} from "@/data/mock"
-import { buildRoutes, tradeoffLine, routeExplanations } from "@/lib/routing"
+	SAMPLE_ORIGIN,
+	SAMPLE_PLACES,
+	sampleTrip,
+	searchPlaces,
+	type SamplePlace,
+} from "@/lib/sample-trip"
+import { buildTags, selectGuidance, type GuidanceSensitivity } from "@/lib/guidance"
+import { readSnapshot } from "@/lib/read-live"
+import type {
+	AssistantLanguage,
+	AssistantReply,
+	AssistantRequestBody,
+	ConditionsSnapshot,
+	ParsedTrip,
+	SavedProfile,
+} from "@/lib/assistant-types"
 
-export type ChatChip = { label: string; message: string }
-
-export type AssistantReply = {
-  text: string
-  chips?: ChatChip[]
-  destinationId?: string
-  mode?: Mode
-  health?: Partial<Health>
-}
-
-export type AssistantContext = {
-  start: Place
-  mode: Mode
-  health: Health
-  scenario: Scenario
-  explanations: string[]
-}
-
-const DIRECTION_PLACES = [
-  "Parc La Fontaine",
-  "Jean-Talon Market",
-  "Atwater Market",
-  "McGill University",
-  "Old Port",
+const PLACE_ALIASES: Array<[string, string]> = [
+	["atwater", "Atwater Market"],
+	["jean-talon", "Jean-Talon Market"],
+	["jean talon", "Jean-Talon Market"],
+	["la fontaine", "Parc La Fontaine"],
+	["vieux-port", "Old Port"],
+	["vieux port", "Old Port"],
+	["old port", "Old Port"],
+	["mont-royal", "Mount Royal chalet"],
+	["mont royal", "Mount Royal chalet"],
+	["mount royal", "Mount Royal chalet"],
+	["centre-ville", "Downtown"],
+	["downtown", "Downtown"],
 ]
 
-const EXAMPLE = 'Try "bike to Atwater Market this afternoon".'
+const parsedSchema = z.object({
+	intent: z.enum(["directions", "conditions", "places", "unclear"]),
+	fromText: z.string().nullable(),
+	toText: z.string().nullable(),
+	mode: z.enum(["walk", "bike"]).nullable(),
+	timeOfDay: z.enum(["morning", "afternoon", "evening", "now"]).nullable(),
+	activity: z.string().nullable(),
+	mentionedSensitivities: z.array(z.enum(["asthma", "copd", "heat"])),
+	language: z.enum(["en", "fr"]),
+})
 
-export function answerMessage(raw: string, ctx: AssistantContext): AssistantReply {
-  const text = raw.trim()
-  const q = text.toLowerCase()
+const explanationSchema = z.object({
+	explanation: z.string().min(1),
+})
 
-  if (isPhrase(q, ["get directions"])) {
-    return {
-      text: 'Sure. Where to? Pick a place or type it, for example "bike to Atwater Market this afternoon".',
-      chips: DIRECTION_PLACES.map((label) => ({
-        label,
-        message: `Directions to ${label}`,
-      })),
-    }
-  }
-  if (isPhrase(q, ["check conditions", "conditions"])) {
-    return { text: conditionsText(ctx) }
-  }
-  if (isPhrase(q, ["find somewhere to go", "somewhere to go", "where should I go"])) {
-    return suggestPlaces(ctx)
-  }
+const answerSchema = z.object({
+	answer: z.string().min(1),
+	usedSnippetIds: z.array(z.string()),
+})
 
-  const destination = detectPlace(text)
-  const healthPatch = healthPatchFor(q, ctx.health)
-  const nextHealth = { ...ctx.health, ...healthPatch }
-  const mode = modeFor(q, ctx.mode)
-  const when = timeFor(q)
+/**
+ * Answer one assistant turn. Air, weather, and routing are sample data
+ * until those services are connected.
+ */
+export async function handleAssistant (
+	body: AssistantRequestBody,
+): Promise<AssistantReply> {
+	const message = body.message.trim()
+	const fresh = body.parsed ?? (await parseRequest(message, body.hint ?? null, body.history ?? []))
+	const merged = withKnownPlace(mergePrior(fresh, body.prior ?? null, message), message)
+	const hinted = body.hint ?? merged.intent
+	const intent = hinted === "unclear" && merged.toText ? "directions" : hinted
+	const understood = { ...merged, intent }
 
-  if (destination) {
-    const routes = buildRoutes(
-      ctx.start,
-      destination,
-      mode,
-      highestLevel(nextHealth),
-      levelForIndex(ctx.scenario.index) === "poor",
-    )
-    const lines: string[] = []
-    if (routes) {
-      lines.push(
-        `Cleaner air: ${routes.clean.minutes} min. Fastest: ${routes.fast.minutes} min. ${tradeoffLine(routes.fast, routes.clean)}`,
-      )
-    } else {
-      lines.push("Pick a different start and destination.")
-    }
-    lines.push(...healthSetLines(healthPatch))
-    lines.push(forecastSentence(when))
-    lines.push("Forecast values are sample data.")
-    return {
-      text: lines.join("\n"),
-      destinationId: destination.id,
-      mode,
-      health: Object.keys(healthPatch).length ? healthPatch : undefined,
-    }
-  }
-
-  if (/\bwhy\b/.test(q)) {
-    if (ctx.explanations.length === 0) {
-      return { text: "Plan a trip first and I can explain the route." }
-    }
-    return { text: ctx.explanations.map((line) => `• ${line}`).join("\n") }
-  }
-
-  if (/\b(co2|co₂|carbon|emission)\b/.test(q)) {
-    return {
-      text: "We compare your trip with driving the same distance, using 0.17 kg CO₂ per km. Walking and biking produce no tailpipe emissions.",
-    }
-  }
-
-  if (/\b(air quality|aqi|air now|pollution|how is the air|how's the air)\b/.test(q)) {
-    return { text: conditionsText(ctx) }
-  }
-
-  const setLines = healthSetLines(healthPatch)
-  if (setLines.length > 0) {
-    return {
-      text: [...setLines, EXAMPLE].join("\n"),
-      health: healthPatch,
-    }
-  }
-
-  return { text: EXAMPLE }
+	if (intent === "directions") {
+		return planDirections(message, understood, body)
+	}
+	if (intent === "conditions" || intent === "places") {
+		return describeConditions(message, understood, body, intent)
+	}
+	return {
+		kind: "clarify",
+		language: understood.language,
+		question: clarifyQuestion(understood),
+		parsed: understood,
+	}
 }
 
-function healthSetLines(patch: Partial<Health>): string[] {
-  const lines: string[] = []
-  for (const key of ["asthma", "copd", "heat"] as const) {
-    if (patch[key]) {
-      const name = key === "asthma" ? "Asthma" : key === "copd" ? "COPD" : "Heat sensitivity"
-      lines.push(`I've set ${name} to Medium. You can change that under Health info.`)
-    }
-  }
-  return lines
+async function parseRequest (
+	message: string,
+	hint: AssistantRequestBody["hint"],
+	history: Array<{ role: "user" | "assistant"; text: string }>,
+): Promise<ParsedTrip> {
+	const fallback = templateParse(message, hint ?? null)
+	const transcript = history
+		.map((turn) => `${turn.role}: ${turn.text}`)
+		.join("\n")
+	const parsed = await completeJson(
+		parsedSchema,
+		[
+			"You extract a trip request for a Montréal clean-air assistant.",
+			"Reply with JSON only, using this shape:",
+			"{ intent, fromText, toText, mode, timeOfDay, activity,",
+			"mentionedSensitivities, language }.",
+			"Known places: Atwater Market, Jean-Talon Market, Parc La Fontaine,",
+			"Old Port, Mount Royal chalet, Downtown.",
+			"Correct typos to one of those names. awater means Atwater Market.",
+			"intent is directions, conditions, places, or unclear.",
+			"A request to bike or walk somewhere is directions.",
+			"conditions asks if an activity is okay.",
+			"places asks what kind of place to go, not a named venue.",
+			"unclear is only for vague requests like 'somewhere nice' with no place.",
+			"Keep the destination, origin, and mode from earlier turns unless the user changes them.",
+			"fromText is my location when they say from here or from my location.",
+			"mode is walk, bike, or null. timeOfDay is morning, afternoon, evening, now, or null.",
+			"mentionedSensitivities is any of asthma, copd, heat.",
+			"language is fr when the user writes French, otherwise en.",
+			"Use null for unknown strings.",
+		].join(" "),
+		transcript ? `${transcript}\nuser: ${message}` : message,
+	)
+	if (!parsed) {
+		return fallback
+	}
+	return hint ? { ...parsed, intent: hint } : parsed
 }
 
-function isPhrase(q: string, phrases: string[]): boolean {
-  return phrases.some((phrase) => q === phrase || q.startsWith(`${phrase} `) || q.endsWith(` ${phrase}`))
+async function planDirections (
+	message: string,
+	parsed: ParsedTrip,
+	body: AssistantRequestBody,
+): Promise<AssistantReply> {
+	const destination = findPlace(parsed.toText) ?? findPlace(message)
+	if (!destination) {
+		return {
+			kind: "clarify",
+			language: parsed.language,
+			question: clarifyQuestion(parsed),
+			parsed,
+		}
+	}
+	const origin = resolveOrigin(parsed, body.userLocation ?? null)
+	const directions = sampleTrip(origin, destination)
+	if (!directions) {
+		return {
+			kind: "clarify",
+			language: parsed.language,
+			question: clarifyQuestion(parsed),
+			parsed,
+		}
+	}
+	const snapshot = await readSnapshot(destination)
+	const snippets = matchedSnippets(message, parsed, body.profile, snapshot, "routes")
+	const generated = await completeJson(
+		explanationSchema,
+		[
+			"Explain a clean-air walking or biking route in one or two sentences.",
+			"conditions is live Montréal data: RSQA IQA and Open-Meteo weather. Use those numbers.",
+			"Use the route tradeoff and the guidance snippets. Do not give medical advice.",
+			parsed.language === "fr"
+				? "Reply in French."
+				: "Reply in English.",
+			'JSON shape: { "explanation": string }.',
+		].join(" "),
+		JSON.stringify({
+			tradeoff: directions.tradeoff,
+			conditions: snapshot,
+			snippets: snippets.map((snippet) => snippet.text),
+		}),
+	)
+	return {
+		kind: "directions",
+		language: parsed.language,
+		parsed: { ...parsed, toText: destination.label },
+		origin,
+		destination,
+		directions,
+		explanation: generated?.explanation ?? templateExplanation(parsed.language, directions.tradeoff),
+	}
 }
 
-function healthPatchFor(q: string, health: Health): Partial<Health> {
-  const patch: Partial<Health> = {}
-  if (/\basthma\b/.test(q) && !health.asthma) {
-    patch.asthma = 2
-  }
-  if (/\bcopd\b/.test(q) && !health.copd) {
-    patch.copd = 2
-  }
-  if (/\b(heat|hot)\b/.test(q) && !health.heat) {
-    patch.heat = 2
-  }
-  return patch
+async function describeConditions (
+	message: string,
+	parsed: ParsedTrip,
+	body: AssistantRequestBody,
+	intent: "conditions" | "places",
+): Promise<AssistantReply> {
+	const named = findPlace(parsed.toText) ?? findPlace(message)
+	const point = named ?? body.userLocation ?? SAMPLE_ORIGIN
+	const snapshot = await readSnapshot(point)
+	const topic = intent === "places" ? "places" : "forecast"
+	const snippets = matchedSnippets(message, parsed, body.profile, snapshot, topic)
+	const generated = await completeJson(
+		answerSchema,
+		[
+			"Answer using only the supplied guidance snippets and the conditions object.",
+			"conditions is live Montréal data: RSQA IQA (1-25 good, 26-50 acceptable, 51 or more poor) and Open-Meteo feels-like temperature. Do not invent a different index or temperature.",
+			intent === "places"
+				? "Suggest kinds of places (indoors, shade, near water), not specific venues."
+				: "Say whether the activity is a reasonable idea right now.",
+			"Do not give medical advice or name a dose.",
+			parsed.language === "fr"
+				? "Write the answer in French."
+				: "Write the answer in English.",
+			'JSON shape: { "answer": string, "usedSnippetIds": string[] }.',
+		].join(" "),
+		JSON.stringify({
+			question: message,
+			conditions: snapshot,
+			snippets: snippets.map((snippet) => ({
+				id: snippet.id,
+				text: snippet.text,
+			})),
+		}),
+	)
+	const used = new Set(generated?.usedSnippetIds ?? [])
+	const chosen = snippets.filter((snippet) => used.has(snippet.id))
+	const sources = (chosen.length > 0 ? chosen : snippets).map((snippet) => ({
+		id: snippet.id,
+		source: snippet.source,
+		url: snippet.url,
+	}))
+	return {
+		kind: "conditions",
+		language: parsed.language,
+		parsed,
+		answer:
+			generated?.answer ??
+			templateConditionsAnswer(parsed.language, intent, snapshot),
+		conditions: snapshot,
+		sources,
+		note: medicalNote(parsed.language),
+	}
 }
 
-function modeFor(q: string, current: Mode): Mode {
-  const bike = q.search(/\b(bike|biking|bicycle|cycl\w*)\b/)
-  const walk = q.search(/\b(walk|walking|on foot)\b/)
-  if (bike >= 0 && walk >= 0) {
-    return bike > walk ? "bike" : "walk"
-  }
-  if (bike >= 0) {
-    return "bike"
-  }
-  if (walk >= 0) {
-    return "walk"
-  }
-  return current
+function matchedSnippets (
+	message: string,
+	parsed: ParsedTrip,
+	profile: SavedProfile,
+	snapshot: ConditionsSnapshot,
+	topic: "routes" | "places" | "forecast",
+) {
+	const sensitivities = new Set<GuidanceSensitivity>(parsed.mentionedSensitivities)
+	if (profile.asthma === "medium" || profile.asthma === "high") {
+		sensitivities.add("asthma")
+	}
+	if (profile.copd === "medium" || profile.copd === "high") {
+		sensitivities.add("copd")
+	}
+	if (profile.heat === "medium" || profile.heat === "high") {
+		sensitivities.add("heat")
+	}
+	const tags = buildTags(
+		{
+			airLevel: snapshot.airLevel,
+			aqhiCategory:
+				snapshot.airLevel === "unknown" ? undefined : snapshot.aqhiCategory,
+			mainPollutant: snapshot.mainPollutant,
+			heatWarning: snapshot.heatWarning,
+			feelsLikeC: snapshot.feelsLikeC,
+		},
+		[...sensitivities],
+		message,
+		topic,
+	)
+	return selectGuidance(tags, 5)
 }
 
-function timeFor(q: string): ForecastId | null {
-  let found: ForecastId | null = null
-  if (/\bmorning\b/.test(q)) {
-    found = "morning"
-  }
-  if (/\b(noon|lunch|midday)\b/.test(q)) {
-    found = "midday"
-  }
-  if (/\bafternoon\b/.test(q)) {
-    found = "afternoon"
-  }
-  if (/\b(evening|tonight)\b/.test(q)) {
-    found = "evening"
-  }
-  return found
+function resolveOrigin (parsed: ParsedTrip, userLocation: Place | null): Place {
+	const from = parsed.fromText?.trim().toLowerCase() ?? ""
+	const here =
+		from === "" ||
+		from === "your location" ||
+		from === "my location" ||
+		from === "here" ||
+		from === "ici" ||
+		from === "ma position"
+	if (here && userLocation) {
+		return userLocation
+	}
+	return findPlace(parsed.fromText) ?? userLocation ?? SAMPLE_ORIGIN
 }
 
-function forecastSentence(focusId: ForecastId | null): string {
-  const focus = FORECAST.find((item) => item.id === focusId) ?? FORECAST[2]
-  const best = FORECAST.reduce((left, right) => (left.index <= right.index ? left : right))
-  if (focus.id === best.id) {
-    return `Air is forecast around ${focus.index} in ${focus.label}, so going ${best.advice} is best.`
-  }
-  return `Air is forecast around ${focus.index} in ${focus.label} and about ${best.index} in ${best.label}, so going ${best.advice} is best.`
+function normalizePlace (text: string): string {
+	return text
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(/\p{Diacritic}/gu, "")
 }
 
-function conditionsText(ctx: AssistantContext): string {
-  const { scenario, health } = ctx
-  const level = levelForIndex(scenario.index)
-  const trend =
-    scenario.index > scenario.previous
-      ? `getting worse (up from ${scenario.previous})`
-      : scenario.index < scenario.previous
-        ? `improving (down from ${scenario.previous})`
-        : "steady"
-  let text = `Air quality is ${levelLabel(level)} (${scenario.index}) at Saint-Jean-Baptiste station, ${trend}. Main pollutant: ${scenario.pollutant}.\n`
-  text += `It's ${scenario.temp}°C`
-  if (scenario.feels >= scenario.temp + 3) {
-    text += `, feels like ${scenario.feels}°`
-  }
-  text += `, ${scenario.sky.toLowerCase()}, wind ${scenario.wind} km/h.`
-  if (scenario.heatWarning) {
-    text += " A heat warning is in effect."
-  }
-  text += `\nBest time to go: ${scenario.best.toLowerCase()}.`
-  if (level === "poor") {
-    text += "\nAir is poor, so consider going later or taking the metro."
-  }
-  const chosen = (["asthma", "copd", "heat"] as const).flatMap((key) => {
-    const value = health[key]
-    if (!value) {
-      return []
-    }
-    const name = key === "asthma" ? "Asthma" : key === "copd" ? "COPD" : "Heat sensitivity"
-    return [`${name} (${LEVEL_LABEL[value].toLowerCase()})`]
-  })
-  if (chosen.length === 0) {
-    text += "\nAdd your health info and I can tailor this to you."
-  } else if (highestLevel(health) >= 2 || level === "poor" || scenario.heatWarning) {
-    text += `\nFor your ${chosen.join(", ")}: take the cleaner route and keep trips short.`
-  } else {
-    text += `\nFor your ${chosen.join(", ")}: the standard clean-air mode is fine.`
-  }
-  return text
+function editDistance (left: string, right: string): number {
+	const row = Array.from({ length: right.length + 1 }, (_, index) => index)
+	for (let i = 1; i <= left.length; i += 1) {
+		let previous = row[0] ?? 0
+		row[0] = i
+		for (let j = 1; j <= right.length; j += 1) {
+			const current = row[j] ?? 0
+			const cost = left[i - 1] === right[j - 1] ? 0 : 1
+			row[j] = Math.min(
+				current + 1,
+				(row[j - 1] ?? 0) + 1,
+				previous + cost,
+			)
+			previous = current
+		}
+	}
+	return row[right.length] ?? 0
 }
 
-function suggestPlaces(ctx: AssistantContext): AssistantReply {
-  const level = levelForIndex(ctx.scenario.index)
-  const favourShade = ctx.scenario.heatWarning || ctx.health.heat !== null
-  const ranked = DESTINATIONS.filter((place) => place.id !== ctx.start.id)
-    .map((place) => {
-      const routes = buildRoutes(
-        ctx.start,
-        place,
-        ctx.mode,
-        highestLevel(ctx.health),
-        level === "poor",
-      )
-      return { place, minutes: routes?.clean.minutes ?? 1 }
-    })
-    .sort((a, b) => {
-      if (favourShade && a.place.shaded !== b.place.shaded) {
-        return a.place.shaded ? -1 : 1
-      }
-      return a.minutes - b.minutes
-    })
-    .slice(0, 3)
+const SKIP_WORDS = new Set([
+	"bike",
+	"biking",
+	"walk",
+	"walking",
+	"from",
+	"want",
+	"market",
+	"parc",
+	"park",
+	"chalet",
+])
 
-  let text = "Here are three good picks from where you are"
-  if (favourShade) {
-    text += ", favouring shade because of the heat"
-  }
-  if (level === "poor") {
-    text += ". Air is poor, so keep it short"
-  }
-  text += ":"
-  const how = ctx.mode === "bike" ? "by bike" : "on foot"
-  for (const item of ranked) {
-    text += `\n• ${item.place.name}: ${item.place.description} (about ${item.minutes} min ${how})`
-  }
-  text += "\nTap one for directions."
-  return {
-    text,
-    chips: ranked.map((item) => ({
-      label: item.place.name,
-      message: `Directions to ${item.place.name}`,
-    })),
-  }
+export function findPlace (text: string | null): SamplePlace | null {
+	if (!text) {
+		return null
+	}
+	const needle = normalizePlace(text)
+	for (const [alias, label] of PLACE_ALIASES) {
+		if (needle.includes(alias)) {
+			return SAMPLE_PLACES.find((place) => place.label === label) ?? null
+		}
+	}
+	const words = needle.split(/[^a-z0-9]+/).filter((word) => word.length >= 5)
+	let best: { place: SamplePlace; score: number } | null = null
+	for (const place of SAMPLE_PLACES) {
+		const tokens = normalizePlace(place.label)
+			.split(/[^a-z0-9]+/)
+			.filter((token) => token.length >= 5 && !SKIP_WORDS.has(token))
+		for (const word of words) {
+			if (SKIP_WORDS.has(word)) {
+				continue
+			}
+			for (const token of tokens) {
+				const distance = editDistance(word, token)
+				const limit = Math.max(token.length, word.length) >= 7 ? 2 : 1
+				if (distance > limit) {
+					continue
+				}
+				const score = token.length - distance
+				if (!best || score > best.score) {
+					best = { place, score }
+				}
+			}
+		}
+	}
+	return best?.place ?? searchPlaces(text)[0] ?? null
 }
 
-export function explanationsFor(
-  start: Place,
-  destination: Place | null,
-  mode: Mode,
-  health: Health,
-  scenario: Scenario,
-): string[] {
-  if (!destination) {
-    return []
-  }
-  const routes = buildRoutes(
-    start,
-    destination,
-    mode,
-    highestLevel(health),
-    levelForIndex(scenario.index) === "poor",
-  )
-  if (!routes) {
-    return []
-  }
-  return routeExplanations(routes.fast, health, levelForIndex(scenario.index) === "poor")
+function withKnownPlace (parsed: ParsedTrip, message: string): ParsedTrip {
+	const named = findPlace(parsed.toText) ?? findPlace(message)
+	if (!named) {
+		return parsed
+	}
+	return { ...parsed, toText: named.label }
+}
+
+function mergePrior (
+	parsed: ParsedTrip,
+	prior: ParsedTrip | null,
+	message: string,
+): ParsedTrip {
+	if (!prior) {
+		return parsed
+	}
+	const fromHere = /\b(my location|from here|from my location|ici)\b/i.test(message)
+	return {
+		...parsed,
+		toText: parsed.toText ?? prior.toText,
+		fromText: parsed.fromText ?? (fromHere ? "my location" : prior.fromText),
+		mode: parsed.mode ?? prior.mode,
+		timeOfDay: parsed.timeOfDay ?? prior.timeOfDay,
+		activity: parsed.activity ?? prior.activity,
+		mentionedSensitivities: parsed.mentionedSensitivities.length > 0
+			? parsed.mentionedSensitivities
+			: prior.mentionedSensitivities,
+		language: parsed.language,
+	}
+}
+
+function templateParse (
+	message: string,
+	hint: AssistantRequestBody["hint"],
+): ParsedTrip {
+	const language = looksFrench(message) ? "fr" : "en"
+	const lower = message.toLowerCase()
+	const place = findPlace(message)
+	let intent: ParsedTrip["intent"] = hint ?? "unclear"
+	if (!hint) {
+		if (/\b(where can i go|somewhere to go|ou puis-je|où puis-je|endroit)\b/.test(lower)) {
+			intent = "places"
+		} else if (/\b(is it okay|can i|safe to|puis-je|est-ce que)\b/.test(lower)) {
+			intent = "conditions"
+		} else if (place && /\b(to|au|aux|vers|going|vais|bike|velo|vélo|walk)\b/.test(lower)) {
+			intent = "directions"
+		}
+	}
+	const mentioned: ParsedTrip["mentionedSensitivities"] = []
+	if (/asthma|asthme/.test(lower)) {
+		mentioned.push("asthma")
+	}
+	if (/\bcopd\b|mpoc/.test(lower)) {
+		mentioned.push("copd")
+	}
+	if (/\bheat\b|chaleur/.test(lower)) {
+		mentioned.push("heat")
+	}
+	let mode: ParsedTrip["mode"] = null
+	if (/\b(bike|biking|cycling|velo|vélo)\b/.test(lower)) {
+		mode = "bike"
+	} else if (/\b(walk|walking|marche|à pied|a pied)\b/.test(lower)) {
+		mode = "walk"
+	}
+	let timeOfDay: ParsedTrip["timeOfDay"] = null
+	if (/afternoon|apres-midi|après-midi/.test(lower)) {
+		timeOfDay = "afternoon"
+	} else if (/evening|soir/.test(lower)) {
+		timeOfDay = "evening"
+	} else if (/morning|matin/.test(lower)) {
+		timeOfDay = "morning"
+	} else if (/right now|maintenant|\bnow\b/.test(lower)) {
+		timeOfDay = "now"
+	}
+	const fromHere = /\b(my location|from here|from my location|ici)\b/.test(lower)
+	return {
+		intent,
+		fromText: fromHere ? "my location" : null,
+		toText: place?.label ?? null,
+		mode,
+		timeOfDay,
+		activity: /run|jog|courir|course/.test(lower) ? "run" : null,
+		mentionedSensitivities: mentioned,
+		language,
+	}
+}
+
+function looksFrench (message: string): boolean {
+	return /[àâçéèêëîïôùûüœ]|\b(je|vais|velo|vélo|marche|pour|avec|ou|où)\b/i.test(
+		message,
+	)
+}
+
+function clarifyQuestion (parsed: ParsedTrip): string {
+	const needPlace = !parsed.toText
+	const needMode = !parsed.mode
+	if (parsed.language === "fr") {
+		if (needPlace && needMode) {
+			return "Vers où, et est-ce à pied ou à vélo ?"
+		}
+		if (needPlace) {
+			return "Vers où dois-je vous guider ?"
+		}
+		return "Est-ce à pied ou à vélo ?"
+	}
+	if (needPlace && needMode) {
+		return "Where would you like to go, and will you walk or bike?"
+	}
+	if (needPlace) {
+		return "Where should I route you?"
+	}
+	return "Will you walk or bike?"
+}
+
+function templateExplanation (language: AssistantLanguage, tradeoff: string): string {
+	if (language === "fr") {
+		return `Le trajet à l'air plus propre : ${tradeoff}. Il évite les rues les plus passantes.`
+	}
+	return `The cleaner route is ${tradeoff}. It stays off the busiest roads.`
+}
+
+function templateConditionsAnswer (
+	language: AssistantLanguage,
+	intent: "conditions" | "places",
+	snapshot: ConditionsSnapshot,
+): string {
+	if (snapshot.airLevel === "unknown") {
+		return language === "fr"
+			? "Je n'ai pas de lecture RSQA pour cet endroit en ce moment."
+			: "I don't have an RSQA reading for that spot right now."
+	}
+	const heat = snapshot.heatWarning
+		? language === "fr"
+			? " Un avertissement de chaleur est en vigueur."
+			: " A heat warning is in effect."
+		: ""
+	const pollutant = snapshot.mainPollutant ?? "mixed"
+	if (intent === "places") {
+		return language === "fr"
+			? `L'IQA est ${snapshot.aqi} (${snapshot.levelLabel}) et le ressenti est ${snapshot.feelsLikeC}°C.${heat} Cherchez un endroit à l'intérieur, à l'ombre ou près de l'eau si l'effort dehors est difficile.`
+			: `The IQA is ${snapshot.aqi} (${snapshot.levelLabel}) and it feels like ${snapshot.feelsLikeC}°C.${heat} Look for somewhere indoors, in the shade, or near water if a hard outdoor effort would be difficult.`
+	}
+	return language === "fr"
+		? `L'IQA est ${snapshot.aqi} (${snapshot.levelLabel}), polluant principal ${pollutant}. Le ressenti est ${snapshot.feelsLikeC}°C.${heat}`
+		: `The IQA is ${snapshot.aqi} (${snapshot.levelLabel}), with ${pollutant} as the main pollutant. It feels like ${snapshot.feelsLikeC}°C.${heat}`
+}
+
+function medicalNote (language: AssistantLanguage): string {
+	if (language === "fr") {
+		return "Ceci n'est pas un avis médical. Suivez les consignes de votre médecin. Appelez Info-Santé au 811, ou le 911 si les symptômes sont graves."
+	}
+	return "This is not medical advice. Follow your doctor's instructions. Call Info-Santé at 811, or 911 if symptoms are severe."
+}
+
+async function completeJson<T> (
+	schema: z.ZodType<T>,
+	system: string,
+	user: string,
+): Promise<T | null> {
+	const key = process.env.GROQ_API_KEY
+	if (!key) {
+		return null
+	}
+	const model = process.env.GROQ_MODEL || "openai/gpt-oss-120b"
+	const client = new OpenAI({
+		apiKey: key,
+		baseURL: "https://api.groq.com/openai/v1",
+	})
+	let nudge = ""
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		try {
+			const extra = model.startsWith("openai/gpt-oss")
+				? { reasoning_effort: "low" as const }
+				: {}
+			const response = await client.chat.completions.create({
+				model,
+				response_format: { type: "json_object" },
+				messages: [
+					{ role: "system", content: system },
+					{ role: "user", content: user + nudge },
+				],
+				...extra,
+			})
+			const text = response.choices[0]?.message?.content ?? ""
+			const parsed = schema.safeParse(JSON.parse(text))
+			if (parsed.success) {
+				return parsed.data
+			}
+			nudge =
+				"\n\nReply with JSON only, matching the requested shape."
+		} catch (error) {
+			const status = (error as { status?: number }).status
+			if (status === 429 || attempt === 1) {
+				return null
+			}
+			nudge = "\n\nReply with JSON only, matching the requested shape."
+		}
+	}
+	return null
 }

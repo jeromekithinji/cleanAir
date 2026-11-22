@@ -1,4 +1,5 @@
 import type {
+  AirCategory,
   AssistantResponse,
   AirSnapshot,
   ConditionsResponse,
@@ -64,7 +65,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status}).`)
+    let detail = ""
+    try {
+      const body = (await response.json()) as { detail?: unknown }
+      if (typeof body.detail === "string") {
+        detail = body.detail
+      }
+    } catch {
+      detail = ""
+    }
+    throw new Error(detail || `Request failed (${response.status}).`)
   }
 
   return response.json() as Promise<T>
@@ -100,14 +110,18 @@ export function planRoutes(
   destination: Place,
   profile: HealthProfile,
   poorAir: boolean,
+  airLevel?: AirCategory,
+  signal?: AbortSignal,
 ): Promise<RoutesResponse> {
   return request("/api/route", {
     method: "POST",
+    signal,
     body: JSON.stringify({
       origin,
       destination,
       profile,
       poor_air: poorAir,
+      ...(airLevel ? { air_level: airLevel } : {}),
     }),
   })
 }
