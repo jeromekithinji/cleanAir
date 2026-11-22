@@ -6,7 +6,7 @@ import type { ExpressionSpecification, FilterSpecification } from "@maplibre/map
 import "maplibre-gl/dist/maplibre-gl.css"
 import { PLACES, type Place, type Point } from "@/data/mock"
 import type { HeatGrid } from "@/lib/heat-grid"
-import { type RouteId, type RoutePair } from "@/lib/routing"
+import { formatMinutes, type RouteId, type RoutePair } from "@/lib/routing"
 
 export type Insets = { top: number; right: number; bottom: number; left: number }
 
@@ -507,10 +507,10 @@ export function MapView({
           const line = routeLine(route, start, destination, gps)
           const mid = line[Math.floor(line.length / 2)] ?? line[0]
           if (!mid) {
-            return { id, left: 0, top: 0, text: `${route.bubble} ${route.minutes} min` }
+            return { id, left: 0, top: 0, text: `${route.bubble} ${formatMinutes(route.minutes)}` }
           }
           const pos = map.project(mid)
-          return { id, left: pos.x, top: pos.y, text: `${route.bubble} ${route.minutes} min` }
+          return { id, left: pos.x, top: pos.y, text: `${route.bubble} ${formatMinutes(route.minutes)}` }
         }),
       )
     }

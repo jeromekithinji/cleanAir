@@ -360,8 +360,8 @@ dd {
   position: absolute;
   top: 54px;
   right: 0;
-  width: 240px;
-  padding: 12px 14px;
+  width: 280px;
+  padding: 14px;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -369,6 +369,128 @@ dd {
   font-size: 14px;
   color: var(--text);
 }
+
+/* ---------- Profile (prototype account) ---------- */
+
+.account-initials {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--pop);
+  color: var(--on-primary);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.profile-who {
+  min-width: 0;
+}
+
+.profile-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.profile-co2 {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--good-bg);
+  color: var(--good-fg);
+}
+
+.profile-co2-label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.profile-co2-value {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.profile-co2-unit {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.profile-co2-detail {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.profile-row {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 44px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-row-action {
+  font-weight: 500;
+  color: var(--pop);
+}
+
+.profile-signout {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--poor-fg);
+}
+
+.profile-signin {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-submit {
+  margin-top: 12px;
+}
+
+
 
 /* ---------- Search ---------- */
 

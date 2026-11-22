@@ -192,6 +192,13 @@ export const SendIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const LeafIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z" />
+    <path d="M2 21c0-3 1.9-5.4 5.2-6.1C9.5 14.5 12 13 13 12" />
+  </Svg>
+)
+
 /** Exposure map: three waves rising off a road. */
 export const ExposureIcon = (p: IconProps) => (
   <Svg {...p}>
