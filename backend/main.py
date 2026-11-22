@@ -16,7 +16,6 @@ from models import (
     GeocodeResponse,
     RoutesRequest,
     RoutesResponse,
-    Sensitivity,
 )
 from routing import plan_routes
 from settings import get_settings
@@ -113,12 +112,8 @@ async def geocode(q: str = Query(min_length=1)) -> GeocodeResponse:
 async def conditions(
     lat: float = Query(ge=-90, le=90),
     lon: float = Query(ge=-180, le=180),
-    asthma: Sensitivity = Sensitivity.medium,
-    copd: Sensitivity = Sensitivity.low,
-    heat: Sensitivity = Sensitivity.medium,
-    poor_air: bool = False,
 ) -> ConditionsResponse:
-    return await build_conditions(lat, lon, asthma, copd, heat, poor_air)
+    return await build_conditions(lat, lon)
 
 
 @app.post("/assistant", response_model=AssistantResponse)

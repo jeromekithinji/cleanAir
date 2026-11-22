@@ -1,0 +1,117 @@
+{
+  "downloaded_at": "2026-11-22T02:27:56+00:00",
+  "stations": [
+    {
+      "station_id": 3,
+      "name": "Saint-Jean-Baptiste",
+      "neighbourhood": "Rivière-des-Prairies",
+      "latitude": 45.641026,
+      "longitude": -73.499682,
+      "reading": {
+        "iqa": 12,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 6,
+      "name": "Anjou",
+      "neighbourhood": "Anjou",
+      "latitude": 45.602846,
+      "longitude": -73.558874,
+      "reading": {
+        "iqa": 11,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 17,
+      "name": "Caserne 17",
+      "neighbourhood": "Montréal-Nord",
+      "latitude": 45.593325,
+      "longitude": -73.637328,
+      "reading": {
+        "iqa": 18,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 31,
+      "name": "Saint-Dominique",
+      "neighbourhood": "Ville-Marie",
+      "latitude": 45.512189,
+      "longitude": -73.566842,
+      "reading": {
+        "iqa": 13,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 33,
+      "name": "Autoroute 13",
+      "neighbourhood": "St-Laurent",
+      "latitude": 45.48484,
+      "longitude": -73.72757,
+      "reading": null
+    },
+    {
+      "station_id": 55,
+      "name": "Rivière-des-Prairies",
+      "neighbourhood": "Rivière-des-Prairies",
+      "latitude": 45.651722,
+      "longitude": -73.573896,
+      "reading": {
+        "iqa": 11,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 80,
+      "name": "Saint-Joseph",
+      "neighbourhood": "Rosemont-La Petite-Patrie",
+      "latitude": 45.542767,
+      "longitude": -73.572039,
+      "reading": {
+        "iqa": 11,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 99,
+      "name": "Sainte-Anne-de-Bellevue",
+      "neighbourhood": "Sainte-Anne-de-Bellevue",
+      "latitude": 45.426509,
+      "longitude": -73.928944,
+      "reading": {
+        "iqa": 17,
+        "level": "good",
+        "pollutant": "O3",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    },
+    {
+      "station_id": 103,
+      "name": "York/Roberval",
+      "neighbourhood": "Sud-Ouest",
+      "latitude": 45.464611,
+      "longitude": -73.582583,
+      "reading": {
+        "iqa": 16,
+        "level": "good",
+        "pollutant": "PM2.5",
+        "observed_at": "2026-11-21T18:00:00-05:00"
+      }
+    }
+  ]
+}

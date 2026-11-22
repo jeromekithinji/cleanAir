@@ -59,12 +59,26 @@ class AirReading(BaseModel):
     observed_at: str | None = None
 
 
+# One time step from Open-Meteo: {"time": ..., "temperature_2m": 7.0, ...}.
+# The variable names are the lists in backend/weather.py.
+WeatherRow = dict[str, int | float | str | None]
+
+
 class ConditionsResponse(BaseModel):
-    air: AirReading
-    apparent_temperature_c: float | None = None
-    banner: str
-    suggest_metro: bool
-    better_time: str | None = None
+    """Weather only: every Open-Meteo variable in backend/weather.py."""
+
+    # "stored" = from air.sqlite, "live" = asked Open-Meteo directly.
+    source: Literal["stored", "live", "unavailable"]
+    # The RSQA station whose forecast was used (stored source only).
+    station_name: str | None = None
+    # The current hour's row from hourly.
+    current: WeatherRow | None = None
+    # The current hour and the hours after it. "time" is local with offset.
+    hourly: list[WeatherRow] = []
+    # One row per day. "date" is YYYY-MM-DD.
+    daily: list[WeatherRow] = []
+    # {"hourly": {"rain": "mm", ...}, "daily": {"rain_sum": "mm", ...}}
+    units: dict[str, dict[str, str]] = {}
 
 
 class LineString(BaseModel):
