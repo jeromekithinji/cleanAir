@@ -1,6 +1,6 @@
 /**
- * Average car tailpipe CO₂, kilograms per kilometre.
- * Keep in sync with CAR_G_PER_KM in backend/co2.py (US EPA average gasoline car, 404 g per mile).
+ * Average car tailpipe CO₂, kilograms per kilometre: 251 g/km, the US EPA
+ * average gasoline car (404 g per mile). Same figure as backend/co2.py.
  */
 export const CAR_KG_PER_KM = 0.251
 

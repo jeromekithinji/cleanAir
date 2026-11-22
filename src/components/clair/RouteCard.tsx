@@ -9,6 +9,8 @@ type RouteCardProps = {
   showBusy: boolean
 }
 
+const LEVEL_LABEL = { low: "Low", medium: "Medium", high: "High" } as const
+
 /** Time spent on busy roads, e.g. "2 min in busy areas". */
 function busyTime(route: RouteOption): string {
   if (route.busy <= 0) return "no busy areas"
@@ -18,6 +20,7 @@ function busyTime(route: RouteOption): string {
 
 export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProps) {
   const isFast = route.id === "fast"
+  const exposure = route.exposure
   return (
     <button
       type="button"
@@ -37,6 +40,20 @@ export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProp
       <span className="route-card-line">
         Saved {format1((route.drivingCo2g ?? kgSaved(route.km) * 1000) / 1000)} kg CO₂
       </span>
+      {exposure ? (
+        <span className="exposure-row">
+          <span className="exposure-name">Exposure score</span>
+          <span className="exposure-meter" aria-hidden="true">
+            <span
+              className={`exposure-fill exposure-${exposure.level}`}
+              style={{ width: `${Math.max(4, exposure.score)}%` }}
+            />
+          </span>
+          <span className={`exposure-chip exposure-${exposure.level}`}>
+            {exposure.score}/100 · {LEVEL_LABEL[exposure.level]}
+          </span>
+        </span>
+      ) : null}
     </button>
   )
 }
