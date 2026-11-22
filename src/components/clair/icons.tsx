@@ -192,6 +192,45 @@ export const SendIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const PhoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="7" y="2" width="10" height="20" rx="2" />
+    <path d="M11 18h2" />
+  </Svg>
+)
+
+export const TreeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 22v-6" />
+    <path d="M12 16c-3.5 0-6-2.4-6-5.4C6 7.5 8.5 4.6 12 2c3.5 2.6 6 5.5 6 8.6 0 3-2.5 5.4-6 5.4z" />
+  </Svg>
+)
+
+export const FuelIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 22V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v17" />
+    <path d="M3 22h12" />
+    <path d="M6 9h6" />
+    <path d="M14 10h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3" />
+  </Svg>
+)
+
+export const LeafIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z" />
+    <path d="M2 21c0-3 1.9-5.4 5.2-6.1C9.5 14.5 12 13 13 12" />
+  </Svg>
+)
+
+/** Exposure map: three waves rising off a road. */
+export const ExposureIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 8c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0" />
+    <path d="M3 13c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0" />
+    <path d="M3 18c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0" />
+  </Svg>
+)
+
 export function LocateIcon({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">

@@ -1,4 +1,6 @@
-import type { CSSProperties } from "react"
+"use client"
+
+import { useEffect, useRef, useState, type CSSProperties } from "react"
 import {
   CONDITIONS,
   LEVEL_LABEL,
@@ -7,6 +9,9 @@ import {
   type Health,
   type Level,
 } from "@/data/mock"
+import { Footsteps } from "./Footsteps"
+
+const PROCESSING_MS = 1800
 
 type HealthFormProps = {
   health: Health
@@ -15,6 +20,48 @@ type HealthFormProps = {
 }
 
 export function HealthForm({ health, onChange, onDone }: HealthFormProps) {
+  const [processing, setProcessing] = useState(false)
+  const [lockedHeight, setLockedHeight] = useState<number | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [])
+
+  const handleDone = () => {
+    if (processing) {
+      return
+    }
+    setLockedHeight(cardRef.current?.offsetHeight ?? null)
+    setProcessing(true)
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      onDone()
+    }, PROCESSING_MS)
+  }
+
+  if (processing) {
+    return (
+      <div
+        ref={cardRef}
+        className="health"
+        style={{
+          minHeight: lockedHeight ?? undefined,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+        }}
+      >
+        <Footsteps />
+      </div>
+    )
+  }
+
   const toggle = (key: ConditionKey) => {
     onChange({ ...health, [key]: health[key] ? null : 1 })
   }
@@ -24,7 +71,7 @@ export function HealthForm({ health, onChange, onDone }: HealthFormProps) {
   }
 
   return (
-    <div className="health">
+    <div ref={cardRef} className="health">
       <h2 id="clair-health-title" className="health-title">
         Your health info
       </h2>
@@ -95,7 +142,7 @@ export function HealthForm({ health, onChange, onDone }: HealthFormProps) {
         )
       })}
       <p className="health-hint">Routes aim to reduce time near heavy traffic. This isn&apos;t medical advice.</p>
-      <button type="button" className="btn-primary" onClick={onDone}>
+      <button type="button" className="btn-primary" onClick={handleDone}>
         Done
       </button>
     </div>

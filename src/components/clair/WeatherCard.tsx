@@ -4,7 +4,6 @@ import {
   AtomIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  ClockIcon,
   CloudIcon,
   SunIcon,
   ThermometerIcon,
@@ -23,28 +22,24 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
   const feels = live?.feelsC == null ? null : Math.round(live.feelsC)
   const wind = live?.windKmh == null ? null : Math.round(live.windKmh)
   const hotter = temp != null && feels != null && feels - temp >= 3
-  const source =
-    live?.weatherSource === "live"
-      ? "Open-Meteo · live"
-      : live?.weatherSource === "stored"
-        ? "Open-Meteo · Montréal"
-        : "Weather unavailable"
+  const place = live?.weatherSource === "unavailable" ? "Weather unavailable" : "Montréal"
+  const source = live?.weatherSource === "live" ? "Source: Open-Meteo · live" : "Source: Open-Meteo"
   return (
-    <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather and timing">
+    <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather conditions">
       <div className="widget-head">
         <SunIcon size={20} />
-        <h2 className="widget-title">Weather and timing</h2>
+        <h2 className="widget-title">Weather conditions</h2>
         <button
           type="button"
           className="chevron-btn"
           aria-expanded={open}
-          aria-label={open ? "Collapse weather and timing" : "Expand weather and timing"}
+          aria-label={open ? "Collapse weather conditions" : "Expand weather conditions"}
           onClick={onToggle}
         >
           {open ? <ChevronDownIcon size={20} /> : <ChevronUpIcon size={20} />}
         </button>
       </div>
-      <p className="widget-sub">{live ? source : "Loading the latest forecast…"}</p>
+      <p className="widget-sub">{live ? place : "Loading the latest forecast…"}</p>
       <p className="weather-advice">
         {level === "unknown" ? "Waiting for a live reading" : weatherAdvice(level)}
       </p>
@@ -83,11 +78,6 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
                 {live.rainChance == null ? "—" : `${Math.round(live.rainChance)}%`}
               </span>
             </div>
-            <div className="weather-row">
-              <ClockIcon size={18} />
-              <span className="weather-row-label">Best time to go</span>
-              <span className="weather-row-value is-best">{live.bestTime}</span>
-            </div>
           </div>
           {live.heatWarning && (
             <p className="heat-banner">
@@ -95,9 +85,12 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
               Heat warning in effect today
             </p>
           )}
-          {live.weatherUpdatedLabel ? (
-            <p className="widget-updated">Last updated {live.weatherUpdatedLabel}</p>
-          ) : null}
+          <div className="widget-footer">
+            <p className="widget-updated">
+              {live.weatherUpdatedLabel ? `Last updated ${live.weatherUpdatedLabel}` : ""}
+            </p>
+            {live.weatherSource !== "unavailable" ? <p className="widget-source">{source}</p> : null}
+          </div>
         </>
       )}
     </section>

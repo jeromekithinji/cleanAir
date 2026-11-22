@@ -2,9 +2,15 @@
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { GeoJSONSource, LngLatBounds, Map, Marker, setWorkerUrl } from "maplibre-gl"
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LineLayerSpecification,
+} from "@maplibre/maplibre-gl-style-spec"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { PLACES, type Place, type Point } from "@/data/mock"
-import { type RouteId, type RoutePair } from "@/lib/routing"
+import type { HeatGrid } from "@/lib/heat-grid"
+import { formatMinutes, type RouteId, type RoutePair } from "@/lib/routing"
 
 export type Insets = { top: number; right: number; bottom: number; left: number }
 
@@ -28,6 +34,9 @@ export type MapViewProps = {
   destination: Place | null
   currentLocation: Point
   label: string
+  /** Exposure map: busy roads glow red, heat layer underneath. */
+  exposureOn: boolean
+  heat: HeatGrid | null
 }
 
 type LngLat = [number, number]
@@ -37,6 +46,32 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty"
 const MONTREAL: LngLat = [-73.59, 45.52]
 const FAST = "#1a73e8"
 const CLEAN = "#1B7A62"
+/** Darker edge around each route line, so it stands out from the map's yellow roads. */
+const FAST_CASING = "#0B4FAE"
+const CLEAN_CASING = "#0B4B3B"
+
+/** White chevron drawn along the selected route to show the direction of travel. */
+function routeArrowImage(): { width: number; height: number; data: Uint8ClampedArray } {
+  const size = 48
+  const canvas = document.createElement("canvas")
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext("2d")
+  if (ctx) {
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 7
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    // Points right: MapLibre turns it to follow the line.
+    ctx.beginPath()
+    ctx.moveTo(17, 12)
+    ctx.lineTo(31, 24)
+    ctx.lineTo(17, 36)
+    ctx.stroke()
+  }
+  const pixels = ctx?.getImageData(0, 0, size, size).data ?? new Uint8ClampedArray(size * size * 4)
+  return { width: size, height: size, data: pixels }
+}
 
 function anchor(place: Place, gps: Gps | null): Gps {
   if (place.id === "current" && gps) {
@@ -101,6 +136,141 @@ function userDot(): HTMLDivElement {
   return wrap
 }
 
+// ---------- Exposure map ----------
+
+const EXPOSURE_LAYERS = ["exposure-heat", "exposure-roads-glow", "exposure-roads"]
+/**
+ * The road types routing.py counts as busy, coloured from highway to secondary.
+ * Most Montréal arterials are secondary, so those stay thin and faint and only
+ * highways and main roads glow; otherwise the whole street grid turns red.
+ */
+const BUSY_CLASSES = ["motorway", "trunk", "primary", "secondary"]
+const GLOW_CLASSES = ["motorway", "trunk", "primary"]
+const ROAD_COLOR: ExpressionSpecification = [
+  "match",
+  ["get", "class"],
+  ["motorway", "trunk"],
+  "#B42324",
+  "primary",
+  "#E24B4A",
+  "#F08A5D",
+]
+/** One slow breath of the red glow, in ms. */
+const PULSE_MS = 2600
+
+function addExposureLayers(map: Map) {
+  // Under the first label layer, so street names stay readable. The routes are
+  // added after the style loads, so they stay on top of all of this.
+  const beforeId = map.getStyle().layers.find((layer) => layer.type === "symbol")?.id
+  map.addSource("exposure-heat", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  })
+  map.addLayer(
+    {
+      id: "exposure-heat",
+      type: "heatmap",
+      source: "exposure-heat",
+      layout: { visibility: "none" },
+      paint: {
+        "heatmap-weight": ["coalesce", ["get", "weight"], 0],
+        "heatmap-intensity": 1.1,
+        // Grid points are ~3.5 km apart: grow the radius with zoom so they blend.
+        "heatmap-radius": ["interpolate", ["exponential", 2], ["zoom"], 9, 22, 11, 90, 13, 360, 15, 1440],
+        "heatmap-color": [
+          "interpolate",
+          ["linear"],
+          ["heatmap-density"],
+          0,
+          "rgba(251, 191, 36, 0)",
+          0.15,
+          "rgba(251, 191, 36, 0.35)",
+          0.4,
+          "rgba(245, 158, 11, 0.55)",
+          0.7,
+          "rgba(226, 75, 74, 0.7)",
+          1,
+          "rgba(180, 35, 36, 0.8)",
+        ],
+        "heatmap-opacity": 0.55,
+      },
+    },
+    beforeId,
+  )
+  const roadFilter = (classes: string[]): FilterSpecification => [
+    "all",
+    ["match", ["get", "class"], classes, true, false],
+    ["!=", ["get", "brunnel"], "tunnel"],
+  ]
+  map.addLayer(
+    {
+      id: "exposure-roads-glow",
+      type: "line",
+      source: "openmaptiles",
+      "source-layer": "transportation",
+      filter: roadFilter(GLOW_CLASSES),
+      layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": ROAD_COLOR,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 4, 13, 9, 16, 20],
+        "line-blur": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 10],
+        "line-opacity": 0.3,
+      },
+    },
+    beforeId,
+  )
+  map.addLayer(
+    {
+      id: "exposure-roads",
+      type: "line",
+      source: "openmaptiles",
+      "source-layer": "transportation",
+      filter: roadFilter(BUSY_CLASSES),
+      layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": ROAD_COLOR,
+        // Secondary roads: thinner and fainter than highways and main roads.
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          10,
+          ["match", ["get", "class"], "secondary", 0.6, 1.6],
+          13,
+          ["match", ["get", "class"], "secondary", 1.4, 3.5],
+          16,
+          ["match", ["get", "class"], "secondary", 3, 7],
+        ],
+        "line-opacity": ["match", ["get", "class"], "secondary", 0.45, 0.85],
+      },
+    },
+    beforeId,
+  )
+}
+
+/**
+ * Heat data for the layer. Each point's weight is where it sits between the
+ * coolest and warmest point. The coolest 30% count for nothing, so only the
+ * warmer areas glow (the grid is even, so equal weights would just tint the
+ * whole city). The whole layer is fainter on cool days and stronger on hot ones.
+ */
+function heatLayerData(heat: HeatGrid): { data: GeoJSON.FeatureCollection; opacity: number } {
+  const min = heat.minC ?? 0
+  const max = heat.maxC ?? 0
+  const spread = Math.max(1, max - min)
+  const features = heat.points.features.map((feature) => {
+    const t = (feature.properties.feels - min) / spread
+    return { ...feature, properties: { ...feature.properties, weight: Math.max(0, (t - 0.3) / 0.7) } }
+  })
+  // 10 °C or less: faint (0.6). 35 °C or more: strong (0.95).
+  const strength = Math.max(0, Math.min(1, (max - 10) / 25))
+  return { data: { type: "FeatureCollection", features }, opacity: 0.6 + 0.35 * strength }
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+}
+
 function clampPadding(map: Map, pad: Insets): Insets {
   const height = map.getContainer().clientHeight || 1
   const width = map.getContainer().clientWidth || 1
@@ -126,6 +296,8 @@ export function MapView({
   destination,
   currentLocation,
   label,
+  exposureOn,
+  heat,
 }: MapViewProps) {
   const mapNodeRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
@@ -135,6 +307,9 @@ export function MapView({
   const userMarkerRef = useRef<Marker | null>(null)
   const pinMarkerRef = useRef<Marker | null>(null)
   const onSelectRef = useRef(onSelectRoute)
+  /** Set once the exposure layers exist; the load handler re-applies the toggle. */
+  const exposureReady = useRef(false)
+  const applyExposureRef = useRef<() => void>(() => undefined)
   const [gps, setGps] = useState<Gps | null>(null)
   const [bubbles, setBubbles] = useState<Array<{ id: RouteId; left: number; top: number; text: string }>>([])
 
@@ -156,24 +331,72 @@ export function MapView({
     })
     map.on("load", () => {
       map.resize()
+      addExposureLayers(map)
+      exposureReady.current = true
+      applyExposureRef.current()
       map.addSource("routes", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
+      })
+      const routeLayout: LineLayerSpecification["layout"] = {
+        "line-cap": "round",
+        "line-join": "round",
+        "line-sort-key": ["get", "rank"],
+      }
+      // Soft shadow under the selected route, so it lifts off the map.
+      map.addLayer({
+        id: "routes-shadow",
+        type: "line",
+        source: "routes",
+        layout: routeLayout,
+        paint: {
+          "line-color": "#10201A",
+          "line-width": ["+", ["get", "width"], 10],
+          "line-blur": 8,
+          "line-translate": [0, 2],
+          "line-opacity": ["case", ["get", "active"], 0.22, 0],
+        },
+      })
+      // Darker edge around both routes.
+      map.addLayer({
+        id: "routes-casing",
+        type: "line",
+        source: "routes",
+        layout: routeLayout,
+        paint: {
+          "line-color": ["get", "casing"],
+          "line-width": ["+", ["get", "width"], 4],
+          "line-opacity": ["get", "opacity"],
+        },
       })
       map.addLayer({
         id: "routes",
         type: "line",
         source: "routes",
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-          "line-sort-key": ["get", "rank"],
-        },
+        layout: routeLayout,
         paint: {
           "line-color": ["get", "color"],
           "line-width": ["get", "width"],
           "line-opacity": ["get", "opacity"],
         },
+      })
+      // Direction arrows on the selected route only.
+      map.addImage("route-arrow", routeArrowImage(), { pixelRatio: 2 })
+      map.addLayer({
+        id: "routes-arrows",
+        type: "symbol",
+        source: "routes",
+        filter: ["==", ["get", "active"], true],
+        layout: {
+          "symbol-placement": "line",
+          "symbol-spacing": 60,
+          "icon-image": "route-arrow",
+          "icon-size": 0.8,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "icon-rotation-alignment": "map",
+        },
+        paint: { "icon-opacity": 0.95 },
       })
       map.on("click", "routes", (event) => {
         const id = event.features?.[0]?.properties?.id
@@ -197,10 +420,59 @@ export function MapView({
       pinMarkerRef.current?.remove()
       userMarkerRef.current = null
       pinMarkerRef.current = null
+      exposureReady.current = false
       map.remove()
       mapRef.current = null
     }
   }, [])
+
+  // Exposure map: show or hide the layers, load the heat data, run the pulse.
+  useEffect(() => {
+    let frame = 0
+    const apply = () => {
+      const map = mapRef.current
+      if (!map || !exposureReady.current) {
+        return
+      }
+      const visibility = exposureOn ? "visible" : "none"
+      for (const id of EXPOSURE_LAYERS) {
+        map.setLayoutProperty(id, "visibility", visibility)
+      }
+      if (heat) {
+        const { data, opacity } = heatLayerData(heat)
+        ;(map.getSource("exposure-heat") as GeoJSONSource | undefined)?.setData(data)
+        // Lighter at street zoom, where the 3.5 km grid has no detail to show.
+        map.setPaintProperty("exposure-heat", "heatmap-opacity", [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          12,
+          opacity,
+          15,
+          opacity * 0.45,
+        ])
+      }
+      cancelAnimationFrame(frame)
+      if (!exposureOn || prefersReducedMotion()) {
+        map.setPaintProperty("exposure-roads-glow", "line-opacity", 0.3)
+        return
+      }
+      // Slow breathing glow on the busy roads: the "red wave".
+      let last = 0
+      const pulse = (now: number) => {
+        if (now - last > 50) {
+          last = now
+          const wave = (1 - Math.cos((2 * Math.PI * now) / PULSE_MS)) / 2
+          map.setPaintProperty("exposure-roads-glow", "line-opacity", 0.12 + 0.4 * wave)
+        }
+        frame = requestAnimationFrame(pulse)
+      }
+      frame = requestAnimationFrame(pulse)
+    }
+    applyExposureRef.current = apply
+    apply()
+    return () => cancelAnimationFrame(frame)
+  }, [exposureOn, heat])
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -266,8 +538,10 @@ export function MapView({
                 properties: {
                   id,
                   rank: active ? 2 : 1,
+                  active,
                   color: id === "clean" ? CLEAN : FAST,
-                  width: active ? 7 : 5,
+                  casing: id === "clean" ? CLEAN_CASING : FAST_CASING,
+                  width: active ? 8 : 5,
                   opacity: active ? 1 : 0.55,
                 },
                 geometry: {
@@ -310,10 +584,10 @@ export function MapView({
           const line = routeLine(route, start, destination, gps)
           const mid = line[Math.floor(line.length / 2)] ?? line[0]
           if (!mid) {
-            return { id, left: 0, top: 0, text: `${route.bubble} ${route.minutes} min` }
+            return { id, left: 0, top: 0, text: `${route.bubble} ${formatMinutes(route.minutes)}` }
           }
           const pos = map.project(mid)
-          return { id, left: pos.x, top: pos.y, text: `${route.bubble} ${route.minutes} min` }
+          return { id, left: pos.x, top: pos.y, text: `${route.bubble} ${formatMinutes(route.minutes)}` }
         }),
       )
     }

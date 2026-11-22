@@ -1,5 +1,8 @@
-/** Average car tailpipe CO₂, kilograms per kilometre. Verify before launch. */
-export const CAR_KG_PER_KM = 0.17
+/**
+ * Average car tailpipe CO₂, kilograms per kilometre: 251 g/km, the US EPA
+ * average gasoline car (404 g per mile). Same figure as backend/co2.py.
+ */
+export const CAR_KG_PER_KM = 0.251
 
 /** About 8 g CO₂ for one smartphone charge. Verify before launch. */
 export const PHONE_CHARGE_KG = 0.00822

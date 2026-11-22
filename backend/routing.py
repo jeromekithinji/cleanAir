@@ -28,6 +28,7 @@ from pathlib import Path
 import httpx
 
 import co2
+import exposure
 from air import nearest_station
 from models import (
     AirCategory,
@@ -133,10 +134,13 @@ def rules_file_for(level: AirCategory) -> Path:
 
 
 
-def route_option(route_id: str, label: str, path: dict) -> RouteOption:
+def route_option(
+    route_id: str, label: str, path: dict, conditions: dict[str, float | None]
+) -> RouteOption:
     """Turn one GraphHopper path into the card the page shows."""
     share = busy_share(path)
     seconds = round(path["time"] / 1000)  # GraphHopper gives milliseconds
+    exposure_score = exposure.score(share, conditions)
     return RouteOption(
         id=route_id,
         label=label,
@@ -148,24 +152,43 @@ def route_option(route_id: str, label: str, path: dict) -> RouteOption:
         driving_co2_g=co2.driving_co2_g(path["distance"]),
         geometry=LineString(coordinates=path["points"]["coordinates"]),
         explanations=[],  # Filled in later by explain.py (another task)
+        exposure_score=exposure_score,
+        exposure_level=exposure.level(exposure_score),
     )
 
 
-def tradeoff_text(fast: RouteOption, clean: RouteOption) -> str:
-    """One line comparing the two routes, e.g. "+3 min, 69% less on busy roads"."""
+def format_minutes(total: int) -> str:
+    """45 -> "45 min", 60 -> "1 h", 75 -> "1 h 15 min"."""
+    if total < 60:
+        return f"{total} min"
+    hours, rest = divmod(total, 60)
+    return f"{hours} h" if rest == 0 else f"{hours} h {rest} min"
+
+
+def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> str:
+    """One line comparing the two routes, e.g. "+3 min, 3 min less in busy areas"."""
     extra = round((clean.duration_seconds - fast.duration_seconds) / 60)
     if extra > 0:
-        time_part = f"+{extra} min"
+        time_part = f"+{format_minutes(extra)}"
     elif extra < 0:
-        time_part = f"{extra} min"  # the clean route is faster: "-2 min"
+        time_part = f"-{format_minutes(-extra)}"  # the clean route is faster: "-2 min"
     else:
         time_part = "Same time"
 
+    if mode == TravelMode.walk:
+        # Sidewalks are mapped as "footway", so busy streets can't be measured
+        # for walking. Don't show a misleading 0%.
+        return f"{time_part}, quieter streets"
+    # Same minutes as the route cards show ("5 min in busy areas").
+    fast_busy = round(fast.busy_time_seconds / 60)
+    clean_busy = round(clean.busy_time_seconds / 60)
+    saved = fast_busy - clean_busy
     if fast.busy_share == 0:
-        busy_part = "both routes avoid busy roads"
+        busy_part = "both routes avoid busy areas"
+    elif saved >= 1:
+        busy_part = f"{format_minutes(saved)} less in busy areas"
     else:
-        drop = round((1 - clean.busy_share / fast.busy_share) * 100)
-        busy_part = f"{drop}% less on busy roads" if drop > 0 else "no fewer busy roads"
+        busy_part = "about the same time in busy areas"
 
     return f"{time_part}, {busy_part}"
 
@@ -179,11 +202,13 @@ async def plan_routes(request: RoutesRequest) -> RoutesResponse:
         request.origin, request.destination, profile, rules_file_for(level)
     )
 
-    fast = route_option("fast", "Fastest", fast_path)
-    clean = route_option("clean", "Cleaner air", clean_path)
+    # Air and heat at the trip start, shared by both routes' exposure scores.
+    conditions = await exposure.conditions_at(request.origin.lat, request.origin.lon)
+    fast = route_option("fast", "Fastest", fast_path, conditions)
+    clean = route_option("clean", "Cleaner air", clean_path, conditions)
 
     return RoutesResponse(
-        tradeoff=tradeoff_text(fast, clean),
+        tradeoff=tradeoff_text(fast, clean,request.profile.mode),
         suggest_metro=level == AirCategory.poor,
         routes=[fast, clean],
     )

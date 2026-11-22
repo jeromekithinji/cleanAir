@@ -71,7 +71,12 @@ export interface RouteOption {
   driving_co2_g: number
   geometry: LineString
   explanations: string[]
+  /** 0-100, lower is better: busy roads, air and heat. See backend/exposure.py. */
+  exposure_score?: number
+  exposure_level?: ExposureLevel
 }
+
+export type ExposureLevel = "low" | "medium" | "high"
 
 export interface RoutesResponse {
   tradeoff: string
