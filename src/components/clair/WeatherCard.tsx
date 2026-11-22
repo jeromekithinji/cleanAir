@@ -4,7 +4,6 @@ import {
   AtomIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  ClockIcon,
   CloudIcon,
   SunIcon,
   ThermometerIcon,
@@ -26,15 +25,15 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
   const place = live?.weatherSource === "unavailable" ? "Weather unavailable" : "Montréal"
   const source = live?.weatherSource === "live" ? "Source: Open-Meteo · live" : "Source: Open-Meteo"
   return (
-    <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather and timing">
+    <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather conditions">
       <div className="widget-head">
         <SunIcon size={20} />
-        <h2 className="widget-title">Weather and timing</h2>
+        <h2 className="widget-title">Weather conditions</h2>
         <button
           type="button"
           className="chevron-btn"
           aria-expanded={open}
-          aria-label={open ? "Collapse weather and timing" : "Expand weather and timing"}
+          aria-label={open ? "Collapse weather conditions" : "Expand weather conditions"}
           onClick={onToggle}
         >
           {open ? <ChevronDownIcon size={20} /> : <ChevronUpIcon size={20} />}
@@ -78,11 +77,6 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
               <span className="weather-row-value">
                 {live.rainChance == null ? "—" : `${Math.round(live.rainChance)}%`}
               </span>
-            </div>
-            <div className="weather-row">
-              <ClockIcon size={18} />
-              <span className="weather-row-label">Best time to go</span>
-              <span className="weather-row-value is-best">{live.bestTime}</span>
             </div>
           </div>
           {live.heatWarning && (
