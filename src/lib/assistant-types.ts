@@ -4,6 +4,7 @@ export interface SavedProfile {
 	asthma: Sensitivity | null
 	copd: Sensitivity | null
 	heat: Sensitivity | null
+	mode?: "walk" | "bike" | null
 }
 
 export type AssistantHint = "directions" | "conditions" | "places"
@@ -38,6 +39,27 @@ export interface GuidanceSource {
 	id: string
 	source: string
 	url: string
+	detail?: string
+}
+
+export interface AssistantTripRoute {
+	id: "fast" | "clean"
+	label: string
+	durationSeconds: number
+	distanceMeters: number
+	busyShare: number
+	mainStreets: string[] | null
+	shadeShare: number | null
+}
+
+/** GraphHopper result already on screen, so a follow-up does not re-route. */
+export interface AssistantTrip {
+	origin: Place
+	destination: Place
+	mode: "walk" | "bike"
+	strictMode: boolean
+	tradeoff: string
+	routes: AssistantTripRoute[]
 }
 
 export interface DirectionsReply {
@@ -48,6 +70,8 @@ export interface DirectionsReply {
 	destination: Place
 	directions: RoutesResponse
 	explanation: string
+	sources: GuidanceSource[]
+	note: string
 }
 
 export interface ConditionsReply {
@@ -65,6 +89,8 @@ export interface ClarifyReply {
 	language: AssistantLanguage
 	question: string
 	parsed: ParsedTrip
+	sources: GuidanceSource[]
+	note: string
 }
 
 export type AssistantReply = DirectionsReply | ConditionsReply | ClarifyReply
@@ -77,6 +103,20 @@ export interface AssistantRequestBody {
 	parsed?: ParsedTrip | null
 	prior?: ParsedTrip | null
 	history?: Array<{ role: "user" | "assistant"; text: string }>
+	trip?: AssistantTrip | null
+}
+
+export function replyText (reply: AssistantReply | undefined): string {
+	if (!reply) {
+		return ""
+	}
+	if (reply.kind === "clarify") {
+		return reply.question
+	}
+	if (reply.kind === "directions") {
+		return reply.explanation
+	}
+	return reply.answer
 }
 
 export interface ChatMessage {

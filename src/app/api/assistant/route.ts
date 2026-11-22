@@ -1,4 +1,4 @@
-import { handleAssistant } from "@/lib/assistant"
+import { AssistantUnavailable, handleAssistant } from "@/lib/assistant"
 import type { AssistantRequestBody } from "@/lib/assistant-types"
 
 export async function POST (request: Request) {
@@ -14,6 +14,13 @@ export async function POST (request: Request) {
 			{ status: 400 },
 		)
 	}
-	const reply = await handleAssistant(body)
-	return Response.json(reply)
+	try {
+		const reply = await handleAssistant(body)
+		return Response.json(reply)
+	} catch (error) {
+		if (error instanceof AssistantUnavailable) {
+			return Response.json({ error: error.message }, { status: error.status })
+		}
+		return Response.json({ error: "The assistant failed." }, { status: 503 })
+	}
 }
