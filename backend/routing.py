@@ -166,7 +166,7 @@ def format_minutes(total: int) -> str:
 
 
 def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> str:
-    """One line comparing the two routes, e.g. "+3 min, 69% less on busy roads"."""
+    """One line comparing the two routes, e.g. "+3 min, 3 min less in busy areas"."""
     extra = round((clean.duration_seconds - fast.duration_seconds) / 60)
     if extra > 0:
         time_part = f"+{format_minutes(extra)}"
@@ -179,11 +179,16 @@ def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> st
         # Sidewalks are mapped as "footway", so busy streets can't be measured
         # for walking. Don't show a misleading 0%.
         return f"{time_part}, quieter streets"
+    # Same minutes as the route cards show ("5 min in busy areas").
+    fast_busy = round(fast.busy_time_seconds / 60)
+    clean_busy = round(clean.busy_time_seconds / 60)
+    saved = fast_busy - clean_busy
     if fast.busy_share == 0:
-        busy_part = "both routes avoid busy roads"
+        busy_part = "both routes avoid busy areas"
+    elif saved >= 1:
+        busy_part = f"{format_minutes(saved)} less in busy areas"
     else:
-        drop = round((1 - clean.busy_share / fast.busy_share) * 100)
-        busy_part = f"{drop}% less on busy roads" if drop > 0 else "no fewer busy roads"
+        busy_part = "about the same time in busy areas"
 
     return f"{time_part}, {busy_part}"
 
