@@ -1,5 +1,12 @@
 import type { CSSProperties } from "react"
-import { CONDITIONS, LEVEL_LABEL, type ConditionKey, type Health, type Level } from "@/data/mock"
+import {
+  CONDITIONS,
+  LEVEL_LABEL,
+  type ConditionKey,
+  type ExtraMinutesOk,
+  type Health,
+  type Level,
+} from "@/data/mock"
 
 type HealthFormProps = {
   health: Health
@@ -34,6 +41,29 @@ export function HealthForm({ health, onChange, onDone }: HealthFormProps) {
             {label}
           </button>
         ))}
+      </div>
+      <div className="level-row">
+        <div className="level-head">
+          <span>Extra time for a healthier route</span>
+        </div>
+        <div className="chips" role="group" aria-label="Extra time">
+          {([
+            [5, "5 min"],
+            [10, "10 min"],
+            [15, "15 min"],
+            ["flexible", "Flexible"],
+          ] as Array<[ExtraMinutesOk, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className="chip"
+              aria-pressed={(health.extraMinutesOk ?? 10) === value}
+              onClick={() => onChange({ ...health, extraMinutesOk: value })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       {CONDITIONS.filter(({ key }) => health[key] !== null).map(({ key, label }) => {
         const level = health[key] as Level

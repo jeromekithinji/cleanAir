@@ -12,7 +12,7 @@ import {
   type Place,
   type Scenario,
 } from "@/data/mock"
-import { planRoutes } from "@/lib/api"
+import { planHealthRoutes } from "@/lib/api"
 import { placeAt } from "@/lib/geocode-place"
 import { SAMPLE_PLACES } from "@/lib/sample-trip"
 import { toScenario, type LiveConditions } from "@/lib/live-view"
@@ -132,6 +132,13 @@ export function App() {
   const [modal, setModal] = useState<ModalState>("welcome")
   const [welcomeDone, setWelcomeDone] = useState(false)
   const [health, setHealth] = useState<Health>(EMPTY_HEALTH)
+  const routeMeta = useRef({
+    tunedFor: [] as string[],
+    advisory: null as string | null,
+    healthCost: null as number | null,
+    busyMinutes: null as { fast: number; clean: number } | null,
+    shadePct: null as { fast: number | null; clean: number | null } | null,
+  })
   const [live, setLive] = useState<LiveConditions | null>(null)
   const [mode, setMode] = useState<Mode>("walk")
 
@@ -296,6 +303,13 @@ export function App() {
       setSuggestMetro(false)
       setRouteError(null)
       setRoutesLoading(false)
+      routeMeta.current = {
+        tunedFor: [],
+        advisory: null,
+        healthCost: null,
+        busyMinutes: null,
+        shadePct: null,
+      }
       return
     }
     const controller = new AbortController()
@@ -305,7 +319,7 @@ export function App() {
     setSuggestMetro(false)
     setRouteError(null)
     setRoutesLoading(true)
-    planRoutes(
+    planHealthRoutes(
       { label: start.name, lat: start.lat, lon: start.lon },
       { label: dest.name, lat: dest.lat, lon: dest.lon },
       {
@@ -313,9 +327,11 @@ export function App() {
         copd: sensitivity(health.copd),
         heat: sensitivity(health.heat),
         mode,
+        extraMinutesOk: health.extraMinutesOk ?? 10,
       },
-      false,
       airKnown ? airLevel : undefined,
+      live?.feelsC ?? null,
+      live?.heatWarning ?? false,
       controller.signal,
     )
       .then((response) => {
@@ -324,6 +340,19 @@ export function App() {
         setTradeoff(planned.tradeoff)
         setExplanations(planned.explanations)
         setSuggestMetro(planned.suggestMetro)
+        routeMeta.current = {
+          tunedFor: planned.tunedFor,
+          advisory: planned.advisory,
+          healthCost: planned.healthCost,
+          busyMinutes: {
+            fast: planned.routes.fast.busyMinutes ?? 0,
+            clean: planned.routes.clean.busyMinutes ?? 0,
+          },
+          shadePct: {
+            fast: planned.routes.fast.shadePct ?? null,
+            clean: planned.routes.clean.shadePct ?? null,
+          },
+        }
         setRoutesLoading(false)
       })
       .catch((error: unknown) => {
@@ -338,7 +367,7 @@ export function App() {
         setRoutesLoading(false)
       })
     return () => controller.abort()
-  }, [start, dest, mode, health, airKnown, airLevel])
+  }, [start, dest, mode, health, airKnown, airLevel, live?.feelsC, live?.heatWarning])
 
   // New pair of routes: fit the camera around both.
   useEffect(() => {
@@ -460,8 +489,9 @@ export function App() {
       durationSeconds: route.minutes * 60,
       distanceMeters: Math.round(route.km * 1000),
       busyShare: route.busy,
+      busyMinutes: route.busyMinutes ?? null,
       mainStreets: null,
-      shadeShare: null,
+      shadeShare: route.shadePct == null ? null : route.shadePct / 100,
     })
     return {
       origin: { label: origin.name, lat: origin.lat, lon: origin.lon },
@@ -470,6 +500,11 @@ export function App() {
       strictMode: airLevel === "poor",
       tradeoff,
       routes: [pack(routes.fast), pack(routes.clean)],
+      tunedFor: routeMeta.current.tunedFor,
+      advisory: routeMeta.current.advisory,
+      healthCost: routeMeta.current.healthCost,
+      busyMinutes: routeMeta.current.busyMinutes,
+      shadePct: routeMeta.current.shadePct,
     }
   }
 
@@ -539,6 +574,7 @@ export function App() {
           copd: sensitivityOrNull(health.copd),
           heat: sensitivityOrNull(health.heat),
           mode,
+          extraMinutesOk: health.extraMinutesOk ?? 10,
         },
         userLocation: origin
           ? { label: origin.name, lat: origin.lat, lon: origin.lon }

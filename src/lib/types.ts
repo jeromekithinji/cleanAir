@@ -77,6 +77,11 @@ export interface RoutesResponse {
   tradeoff: string
   suggest_metro: boolean
   routes: RouteOption[]
+  tuned_for?: string[]
+  advisory?: string | null
+  health_cost?: number | null
+  busy_minutes?: { fast: number; clean: number }
+  shade_pct?: { fast: number | null; clean: number | null }
 }
 
 export interface AssistantResponse {

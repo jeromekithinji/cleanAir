@@ -10,7 +10,11 @@ export type Level = 1 | 2 | 3
 
 export type ConditionKey = "asthma" | "copd" | "heat"
 
-export type Health = Record<ConditionKey, Level | null>
+export type ExtraMinutesOk = 5 | 10 | 15 | "flexible"
+
+export type Health = Record<ConditionKey, Level | null> & {
+  extraMinutesOk?: ExtraMinutesOk
+}
 
 export type Place = {
   id: string
@@ -39,7 +43,12 @@ export type Scenario = {
   stationName?: string
 }
 
-export const EMPTY_HEALTH: Health = { asthma: null, copd: null, heat: null }
+export const EMPTY_HEALTH: Health = {
+  asthma: null,
+  copd: null,
+  heat: null,
+  extraMinutesOk: 10,
+}
 
 export const LEVEL_LABEL: Record<Level, string> = {
   1: "Low",

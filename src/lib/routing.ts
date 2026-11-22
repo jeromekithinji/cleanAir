@@ -33,6 +33,8 @@ export type RouteOption = {
   minutes: number
   busy: number
   drivingCo2g?: number
+  busyMinutes?: number
+  shadePct?: number | null
 }
 
 export type PlannedRoutes = {
@@ -40,6 +42,9 @@ export type PlannedRoutes = {
   tradeoff: string
   explanations: string[]
   suggestMetro: boolean
+  tunedFor: string[]
+  advisory: string | null
+  healthCost: number | null
 }
 
 export type RoutePair = {
@@ -47,7 +52,11 @@ export type RoutePair = {
   clean: RouteOption
 }
 
-function fromApiRoute(option: ApiRoute, bubble: string): RouteOption {
+function fromApiRoute(
+  option: ApiRoute,
+  bubble: string,
+  shadePct: number | null,
+): RouteOption {
   return {
     id: option.id,
     name: option.label,
@@ -58,6 +67,8 @@ function fromApiRoute(option: ApiRoute, bubble: string): RouteOption {
     minutes: Math.max(1, Math.round(option.duration_seconds / 60)),
     busy: option.busy_share,
     drivingCo2g: option.driving_co2_g,
+    busyMinutes: Math.round(option.busy_time_seconds / 60),
+    shadePct,
   }
 }
 
@@ -70,12 +81,15 @@ export function pairFromResponse(response: RoutesResponse): PlannedRoutes {
   }
   return {
     routes: {
-      fast: fromApiRoute(fast, "Fastest"),
-      clean: fromApiRoute(clean, "Cleaner"),
+      fast: fromApiRoute(fast, "Fastest", response.shade_pct?.fast ?? null),
+      clean: fromApiRoute(clean, "Health", response.shade_pct?.clean ?? null),
     },
     tradeoff: response.tradeoff,
     explanations: clean.explanations,
     suggestMetro: response.suggest_metro,
+    tunedFor: response.tuned_for ?? [],
+    advisory: response.advisory ?? null,
+    healthCost: response.health_cost ?? null,
   }
 }
 

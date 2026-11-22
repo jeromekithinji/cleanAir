@@ -5,6 +5,7 @@ export interface SavedProfile {
 	copd: Sensitivity | null
 	heat: Sensitivity | null
 	mode?: "walk" | "bike" | null
+	extraMinutesOk?: 5 | 10 | 15 | "flexible"
 }
 
 export type AssistantHint = "directions" | "conditions" | "places"
@@ -48,6 +49,7 @@ export interface AssistantTripRoute {
 	durationSeconds: number
 	distanceMeters: number
 	busyShare: number
+	busyMinutes?: number | null
 	mainStreets: string[] | null
 	shadeShare: number | null
 }
@@ -60,6 +62,11 @@ export interface AssistantTrip {
 	strictMode: boolean
 	tradeoff: string
 	routes: AssistantTripRoute[]
+	tunedFor?: string[]
+	advisory?: string | null
+	healthCost?: number | null
+	busyMinutes?: { fast: number; clean: number } | null
+	shadePct?: { fast: number | null; clean: number | null } | null
 }
 
 export interface DirectionsReply {

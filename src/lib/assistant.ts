@@ -1,6 +1,6 @@
 import OpenAI from "openai"
 import { z } from "zod"
-import type { Place, RoutesResponse, Sensitivity } from "@/lib/types"
+import type { Place, RoutesResponse } from "@/lib/types"
 import {
 	SAMPLE_PLACES,
 	searchPlaces,
@@ -17,6 +17,8 @@ import { readLiveConditions } from "@/lib/read-live"
 import { buildLive, skyFromCode, toSnapshot, type LiveConditions, type RawAir } from "@/lib/live-view"
 import { readAqhiForecast, readCanadaWeather } from "@/lib/environment-canada"
 import { greetingReply } from "@/lib/greeting"
+import { getDirections } from "@/lib/get-directions"
+import type { HealthSensitivity } from "@/lib/health-routing"
 import type {
 	AssistantLanguage,
 	AssistantReply,
@@ -283,7 +285,12 @@ async function planDirections (
 		: null
 	const routed = reuse && body.trip
 		? tripResponse(body.trip)
-		: await fetchRoutes(origin, destination, mode, body.profile, knownAir)
+		: await fetchRoutes(origin, destination, mode, body.profile, {
+			airLevel: knownAir ?? "acceptable",
+			feelsLikeC: gathered.facts.weather?.feelsLikeC ?? null,
+			heatWarning: gathered.snapshot.heatWarning,
+			aqhiForecast: gathered.facts.aqhiForecast,
+		})
 	const route = reuse && body.trip
 		? tripFacts(body.trip)
 		: routeFacts(routed, gathered.poor)
@@ -297,7 +304,7 @@ async function planDirections (
 		snippets,
 		caution,
 		budget,
-		"Explain the fastest and cleaner routes from the route facts. Use route.tradeoff for the comparison. busyShare is the fraction of distance on busy roads. If route is null, say the street route is unavailable.",
+		"Explain the fastest and health routes from the route facts. Use route.tradeoff. Mention tunedFor when it is not empty, the advisory when it is not null, and busyMinutes, healthCost, and shadePct when they are numbers. The route was chosen by those fixed numbers, not by you. If route is null, say the street route is unavailable.",
 	)
 	if (!generated) {
 		throw new AssistantUnavailable(503, "The assistant could not write an answer.")
@@ -711,7 +718,7 @@ const FACT_RULES = [
 	"Use only the facts object and the guidance snippets.",
 	"A null field is unavailable. Say that it is unavailable.",
 	"Do not invent numbers, times, streets, shade, or health claims.",
-	"shadiest and shadeShare are null because shade is not measured.",
+	"shadePct is an estimate from road class, not a tree survey. Use it only when it is a number.",
 	"mainStreets null means the street list was not calculated.",
 	"Do not give medical advice. If caution is non-empty, include that sentence.",
 	"JSON shape: { \"answer\": string, \"usedSnippetIds\": string[] }.",
@@ -752,6 +759,7 @@ function cacheKeyFor (body: AssistantRequestBody, message: string): string {
 		body.profile.copd,
 		body.profile.heat,
 		body.profile.mode ?? "",
+		body.profile.extraMinutesOk ?? 10,
 	].join("/")
 	const memory = [
 		body.prior?.toText ?? "",
@@ -940,6 +948,11 @@ function tripFacts (trip: AssistantTrip) {
 		fastest: trip.routes.find((route) => route.id === "fast") ?? null,
 		clean: trip.routes.find((route) => route.id === "clean") ?? null,
 		shadiest: null,
+		tunedFor: trip.tunedFor ?? [],
+		advisory: trip.advisory ?? null,
+		healthCost: trip.healthCost ?? null,
+		busyMinutes: trip.busyMinutes ?? null,
+		shadePct: trip.shadePct ?? null,
 	}
 }
 
@@ -952,13 +965,15 @@ function routeFacts (routed: RoutesResponse | null, strictMode: boolean) {
 		if (!route) {
 			return null
 		}
+		const shade = id === "fast" ? routed.shade_pct?.fast : routed.shade_pct?.clean
 		return {
 			label: route.label,
 			durationSeconds: route.duration_seconds,
 			distanceMeters: route.distance_meters,
 			busyShare: route.busy_share,
+			busyMinutes: routed.busy_minutes?.[id] ?? Math.round(route.busy_time_seconds / 60),
 			mainStreets: null,
-			shadeShare: null,
+			shadeShare: shade == null ? null : shade / 100,
 		}
 	}
 	return {
@@ -967,6 +982,11 @@ function routeFacts (routed: RoutesResponse | null, strictMode: boolean) {
 		fastest: pick("fast"),
 		clean: pick("clean"),
 		shadiest: null,
+		tunedFor: routed.tuned_for ?? [],
+		advisory: routed.advisory ?? null,
+		healthCost: routed.health_cost ?? null,
+		busyMinutes: routed.busy_minutes ?? null,
+		shadePct: routed.shade_pct ?? null,
 	}
 }
 
@@ -994,33 +1014,34 @@ async function fetchRoutes (
 	destination: Place,
 	mode: "walk" | "bike",
 	profile: SavedProfile,
-	airLevel: "good" | "acceptable" | "poor" | null,
+	conditions: {
+		airLevel: "good" | "acceptable" | "poor"
+		feelsLikeC: number | null
+		heatWarning: boolean
+		aqhiForecast: Array<{ time: string; aqhi: number }> | null
+	},
 ): Promise<RoutesResponse | null> {
-	const level = (value: Sensitivity | null | undefined): Sensitivity =>
-		value === "high" || value === "medium" || value === "low" ? value : "low"
-	const backend = process.env.BACKEND_URL || "http://127.0.0.1:8000"
+	const sensitivities: HealthSensitivity[] = []
+	if (profile.asthma === "high" || profile.asthma === "medium") {
+		sensitivities.push("asthma")
+	}
+	if (profile.copd === "high" || profile.copd === "medium") {
+		sensitivities.push("copd")
+	}
+	if (profile.heat === "high" || profile.heat === "medium") {
+		sensitivities.push("heat")
+	}
 	try {
-		const response = await fetch(`${backend}/api/route`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			signal: AbortSignal.timeout(5000),
-			body: JSON.stringify({
-				origin,
-				destination,
-				profile: {
-					asthma: level(profile.asthma),
-					copd: level(profile.copd),
-					heat: level(profile.heat),
-					mode,
-				},
-				poor_air: airLevel === "poor",
-				...(airLevel ? { air_level: airLevel } : {}),
-			}),
-		})
-		if (!response.ok) {
-			return null
-		}
-		return await response.json() as RoutesResponse
+		return await getDirections(
+			origin,
+			destination,
+			{
+				sensitivities: sensitivities.length > 0 ? sensitivities : ["none"],
+				mode,
+				extraMinutesOk: profile.extraMinutesOk,
+			},
+			conditions,
+		)
 	} catch {
 		return null
 	}

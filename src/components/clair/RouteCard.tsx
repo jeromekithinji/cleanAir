@@ -24,6 +24,7 @@ export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
       </span>
       <span className="route-card-line">
         {format1(route.km)} km · {Math.round(route.busy * 100)}% on busy roads
+        {route.shadePct != null ? ` · ${Math.round(route.shadePct)}% shaded` : ""}
         {isFast ? " · no air check" : " · tuned to you"}
       </span>
       <span className="route-card-line">
