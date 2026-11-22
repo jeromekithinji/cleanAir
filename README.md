@@ -128,7 +128,7 @@ curl http://127.0.0.1:8000/
 
 curl "http://127.0.0.1:8000/geocode?q=Atwater%20Market"
 
-curl "http://127.0.0.1:8000/conditions?lat=45.48&lon=-73.58&asthma=high&copd=low&heat=high&poor_air=true"
+curl "http://127.0.0.1:8000/conditions?lat=45.48&lon=-73.58"
 
 curl "http://127.0.0.1:8000/api/air?lat=45.48&lon=-73.58"
 
@@ -148,11 +148,11 @@ curl -X POST http://127.0.0.1:8000/assistant \
 | GET | `/docs` | OpenAPI UI |
 | GET | `/geocode?q=` | Address search |
 | GET | `/api/air` | Task B. Nearest station, IQA, and level |
-| GET | `/conditions` | Heat and timing banner, once that slice is built |
+| GET | `/conditions` | Weather: hourly apparent temperature (`python weather.py` stores it hourly) |
 | POST | `/api/route` | Task A. Fastest route and clean-air route |
 | POST | `/assistant` | Sentence in, same route payload out |
 
-`/conditions` query fields are `lat`, `lon`, `asthma`, `copd`, `heat` (`low`, `medium`, or `high`), and `poor_air` (`true` or `false`).
+`/conditions` query fields are `lat` and `lon`.
 
 ## Test the frontend
 
