@@ -17,7 +17,7 @@ Inside plan_routes:
    The second call adds the rules in CLEAN_MODEL.
 3. Ask air.nearest_station for the origin. If the level is "poor", or
    request.poor_air is true, use CLEAN_STRICT_MODEL instead.
-4. Busy share = distance on MOTORWAY, TRUNK, and PRIMARY / total distance.
+4. Busy share = distance on MOTORWAY, TRUNK, PRIMARY, and SECONDARY / total distance.
 5. Tradeoff text, for example "+4 min, 60% less on busy roads".
 6. CO2 numbers come from co2.py.
 """
