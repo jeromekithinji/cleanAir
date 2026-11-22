@@ -17,7 +17,6 @@ function busyTime(route: RouteOption): string {
 }
 
 export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProps) {
-  const isFast = route.id === "fast"
   return (
     <button
       type="button"
@@ -32,7 +31,7 @@ export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProp
       </span>
       <span className="route-card-line">
         {format1(route.km)} km{showBusy ? ` · ${busyTime(route)}` : ""}
-        {isFast ? " · no air check" : " · best route"}
+        {route.id === "fast" ? "" : " · best route"}
       </span>
       <span className="route-card-line">
         Saving {format1((route.drivingCo2g ?? kgSaved(route.km) * 1000) / 1000)} kg CO₂
