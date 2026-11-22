@@ -87,18 +87,10 @@ export function geocode(query: string): Promise<GeocodeResponse> {
   return request(`/geocode?${params.toString()}`)
 }
 
-export function getConditions(
-  place: Place,
-  profile: HealthProfile,
-  poorAir: boolean,
-): Promise<ConditionsResponse> {
+export function getConditions(place: Place): Promise<ConditionsResponse> {
   const params = new URLSearchParams({
     lat: String(place.lat),
     lon: String(place.lon),
-    asthma: profile.asthma,
-    copd: profile.copd,
-    heat: profile.heat,
-    poor_air: String(poorAir),
   })
   return request(`/conditions?${params.toString()}`)
 }

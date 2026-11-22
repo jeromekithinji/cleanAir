@@ -41,12 +41,17 @@ export interface AirReading {
   observed_at: string | null
 }
 
+// One time step from Open-Meteo: { time: "...", temperature_2m: 7, ... }.
+// The variable names are the lists in backend/weather.py.
+export type WeatherRow = Record<string, number | string | null>
+
 export interface ConditionsResponse {
-  air: AirReading
-  apparent_temperature_c: number | null
-  banner: string
-  suggest_metro: boolean
-  better_time: string | null
+  source: "stored" | "live" | "unavailable"
+  station_name: string | null
+  current: WeatherRow | null
+  hourly: WeatherRow[]
+  daily: WeatherRow[]
+  units: { hourly?: Record<string, string>; daily?: Record<string, string> }
 }
 
 export interface LineString {

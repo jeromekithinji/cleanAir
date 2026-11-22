@@ -6,13 +6,27 @@
 graphhopper:
   datareader.file: montreal.osm.pbf
   graph.location: graph-cache
+
   profiles:
     - name: bike
       custom_model_files: [bike.json]
     - name: foot
       custom_model_files: [foot.json]
+
+  # Keep both profiles in flexible mode. An empty list is CH off.
   profiles_ch: []
   profiles_lm: []
+
+  # bike.json and foot.json reference these. GraphHopper 10 refuses to import
+  # until every encoded value used by a profile is listed here. road_class is
+  # what /route?details=road_class reads. average_slope is omitted because
+  # these profiles do not use the elevation models.
+  graph.encoded_values: bike_access, bike_average_speed, bike_priority, roundabout, hike_rating, mtb_rating, foot_access, foot_average_speed, foot_priority, road_class
+
+  # Required since GraphHopper 7. Empty so cycleways, footways, and the busy
+  # roads used for the busy-road percentage are all imported. Naming a profile
+  # bike or foot makes GraphHopper reject footway, cycleway, or path here.
+  import.osm.ignored_highways: ""
 
 server:
   application_connectors:
