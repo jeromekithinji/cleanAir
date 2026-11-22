@@ -18,6 +18,8 @@ export type Place = {
   neighborhood: string
   x: number
   y: number
+  lat: number
+  lon: number
   keywords: string[]
   description: string
   shaded: boolean
@@ -58,6 +60,8 @@ export const PLACES: Place[] = [
     neighborhood: "Mile End",
     x: 330,
     y: 330,
+    lat: 45.5236,
+    lon: -73.6002,
     keywords: ["here", "my location", "mile end", "current location", "current"],
     description: "your current location",
     shaded: false,
@@ -68,6 +72,8 @@ export const PLACES: Place[] = [
     neighborhood: "Plateau-Mont-Royal",
     x: 285,
     y: 215,
+    lat: 45.5269,
+    lon: -73.5693,
     keywords: ["lafontaine", "la fontaine", "fontaine", "plateau"],
     description: "a big park with lots of shade",
     shaded: true,
@@ -78,6 +84,8 @@ export const PLACES: Place[] = [
     neighborhood: "Little Italy",
     x: 560,
     y: 120,
+    lat: 45.5364,
+    lon: -73.6151,
     keywords: ["jean-talon", "jean talon", "talon", "little italy"],
     description: "open-air market on quiet side streets",
     shaded: false,
@@ -88,6 +96,8 @@ export const PLACES: Place[] = [
     neighborhood: "Saint-Henri",
     x: 720,
     y: 470,
+    lat: 45.4797,
+    lon: -73.577,
     keywords: ["atwater", "saint-henri", "saint henri", "lachine"],
     description: "market beside the Lachine Canal path",
     shaded: false,
@@ -98,6 +108,8 @@ export const PLACES: Place[] = [
     neighborhood: "Downtown",
     x: 930,
     y: 190,
+    lat: 45.5048,
+    lon: -73.5773,
     keywords: ["mcgill", "university"],
     description: "tree-lined campus paths",
     shaded: true,
@@ -108,6 +120,8 @@ export const PLACES: Place[] = [
     neighborhood: "Vieux-Montréal",
     x: 1000,
     y: 520,
+    lat: 45.5067,
+    lon: -73.554,
     keywords: ["old port", "vieux-montreal", "vieux-montréal", "vieux"],
     description: "waterfront with a river breeze",
     shaded: false,

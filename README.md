@@ -56,7 +56,7 @@ curl "http://127.0.0.1:8989/route?point=45.479,-73.584&point=45.527,-73.570&prof
    - Call GraphHopper twice. Both requests use `details: ["road_class"]`.
    - First call: profile `bike` or `foot` from the health profile, no custom model. That is the fastest route.
    - Second call: the same profile plus `clean.json`. If the air level is `poor`, or the body has `poor_air: true`, use `clean-strict.json` instead.
-   - Busy-road % is distance on `MOTORWAY`, `TRUNK`, and `PRIMARY` divided by total distance.
+   - Busy-road % is distance on `MOTORWAY`, `TRUNK`, `PRIMARY`, and `SECONDARY` divided by total distance. The bike and foot profiles already avoid primary roads in Montréal, so without `SECONDARY` every route shows 0%.
    - Build the tradeoff line from the two durations and the two percentages, for example `+4 min, 60% less on busy roads`.
 8. The page already posts to `/api/route` from **Compare routes** and prints `tradeoff` above the two cards.
 
