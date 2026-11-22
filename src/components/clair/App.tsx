@@ -268,7 +268,7 @@ export function App() {
         label={
           routes && dest
             ? `Map of Montréal showing a fastest route (${routes.fast.minutes} min) and a cleaner-air route (${routes.clean.minutes} min) to ${dest.name}.`
-            : "Map of Montréal around Mile End, with Rue Notre-Dame, a busy truck route, crossing it."
+            : "Map of Montréal."
         }
       />
 
@@ -336,7 +336,7 @@ export function App() {
       <MapControls
         onZoomIn={() => mapRef.current?.zoomBy(1.5)}
         onZoomOut={() => mapRef.current?.zoomBy(1 / 1.5)}
-        onLocate={() => mapRef.current?.flyTo(CURRENT_LOCATION, 2)}
+        onLocate={() => mapRef.current?.locate()}
       />
 
       <ChatAssistant
