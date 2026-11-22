@@ -95,7 +95,14 @@ export function Planner() {
               />
             </section>
           </div>
-          <RouteMap routes={routes?.routes ?? []} selectedId={selectedId} />
+          <RouteMap
+            origin={origin}
+            destination={null}
+            userLocation={null}
+            routes={routes?.routes ?? []}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
           <RouteCompare
             tradeoff={routes?.tradeoff ?? null}
             routes={routes?.routes ?? []}
