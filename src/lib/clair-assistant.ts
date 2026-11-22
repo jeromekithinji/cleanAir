@@ -10,7 +10,7 @@ import {
   levelLabel,
   LEVEL_LABEL,
 } from "@/data/mock"
-import { buildRoutes, tradeoffLine, routeExplanations } from "@/lib/routing"
+import { buildRoutes, formatMinutes, tradeoffLine, routeExplanations } from "@/lib/routing"
 
 export type ChatChip = { label: string; message: string }
 
@@ -77,7 +77,7 @@ export function answerMessage(raw: string, ctx: AssistantContext): AssistantRepl
     const lines: string[] = []
     if (routes) {
       lines.push(
-        `Cleaner air: ${routes.clean.minutes} min. Fastest: ${routes.fast.minutes} min. ${tradeoffLine(routes.fast, routes.clean)}`,
+        `Cleaner air: ${formatMinutes(routes.clean.minutes)}. Fastest: ${formatMinutes(routes.fast.minutes)}.${tradeoffLine(routes.fast, routes.clean)}`,
       )
     } else {
       lines.push("Pick a different start and destination.")
