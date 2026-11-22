@@ -1484,6 +1484,14 @@ dd {
   padding: 10px 8px 12px;
   border-radius: 14px;
   border: 1px solid var(--line);
+  text-align: center;
+}
+
+.impact-tile-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+  color: var(--pop);
 }
 
 .impact-tile-num {
