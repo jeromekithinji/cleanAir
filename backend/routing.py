@@ -151,7 +151,7 @@ def route_option(route_id: str, label: str, path: dict) -> RouteOption:
     )
 
 
-def tradeoff_text(fast: RouteOption, clean: RouteOption) -> str:
+def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> str:
     """One line comparing the two routes, e.g. "+3 min, 69% less on busy roads"."""
     extra = round((clean.duration_seconds - fast.duration_seconds) / 60)
     if extra > 0:
@@ -161,6 +161,10 @@ def tradeoff_text(fast: RouteOption, clean: RouteOption) -> str:
     else:
         time_part = "Same time"
 
+    if mode == TravelMode.walk:
+        # Sidewalks are mapped as "footway", so busy streets can't be measured
+        # for walking. Don't show a misleading 0%.
+        return f"{time_part}, quieter streets"
     if fast.busy_share == 0:
         busy_part = "both routes avoid busy roads"
     else:
@@ -183,7 +187,7 @@ async def plan_routes(request: RoutesRequest) -> RoutesResponse:
     clean = route_option("clean", "Cleaner air", clean_path)
 
     return RoutesResponse(
-        tradeoff=tradeoff_text(fast, clean),
+        tradeoff=tradeoff_text(fast, clean,request.profile.mode),
         suggest_metro=level == AirCategory.poor,
         routes=[fast, clean],
     )

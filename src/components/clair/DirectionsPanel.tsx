@@ -53,8 +53,8 @@ export function DirectionsPanel(props: DirectionsPanelProps) {
       {routes ? (
         <>
           <div className="route-cards">
-            <RouteCard route={routes.fast} selected={selected === "fast"} onSelect={() => props.onSelect("fast")} />
-            <RouteCard route={routes.clean} selected={selected === "clean"} onSelect={() => props.onSelect("clean")} />
+            <RouteCard route={routes.fast} selected={selected === "fast"} onSelect={() => props.onSelect("fast")} showBusy={mode === "bike"} />
+            <RouteCard route={routes.clean} selected={selected === "clean"} onSelect={() => props.onSelect("clean")} showBusy={mode === "bike"} />
           </div>
           <p className="tradeoff">{props.tradeoff}</p>
           {props.suggestMetro ? (

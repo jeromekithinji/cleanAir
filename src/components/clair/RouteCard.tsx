@@ -6,9 +6,10 @@ type RouteCardProps = {
   route: RouteOption
   selected: boolean
   onSelect: () => void
+  showBusy: boolean
 }
 
-export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
+export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProps) {
   const isFast = route.id === "fast"
   return (
     <button
@@ -23,7 +24,7 @@ export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
         <span className="route-card-min">{route.minutes} min</span>
       </span>
       <span className="route-card-line">
-        {format1(route.km)} km · {Math.round(route.busy * 100)}% on busy roads
+        {format1(route.km)} km{showBusy ? ` · ${Math.round(route.busy * 100)}% on busy roads` : ""}
         {isFast ? " · no air check" : " · tuned to you"}
       </span>
       <span className="route-card-line">
@@ -32,3 +33,4 @@ export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
     </button>
   )
 }
+
