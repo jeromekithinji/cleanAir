@@ -190,11 +190,7 @@ def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> st
     else:
         busy_part = "about the same time in busy areas"
 
-    exposure_part = ""
-    if clean.exposure_score < fast.exposure_score:
-        exposure_part = f", exposure {fast.exposure_score} → {clean.exposure_score}"
-
-    return f"{time_part}, {busy_part}{exposure_part}"
+    return f"{time_part}, {busy_part}"
 
 
 async def plan_routes(request: RoutesRequest) -> RoutesResponse:

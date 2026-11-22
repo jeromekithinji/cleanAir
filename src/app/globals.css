@@ -273,10 +273,14 @@ dd {
   background: var(--fast);
   color: var(--surface);
   z-index: 1;
+  /* White border inside a thin ring of the route colour, like the route outline. */
+  border-color: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--fast), var(--shadow-sm);
 }
 
 .bubble-clean.is-selected {
   background: var(--clean);
+  box-shadow: 0 0 0 1.5px var(--clean), var(--shadow-sm);
 }
 
 @keyframes fade-in {
@@ -808,51 +812,6 @@ dd {
   line-height: 17px;
 }
 
-/* Exposure score row on a route card */
-.exposure-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 5px;
-}
-
-.exposure-name {
-  flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.exposure-meter {
-  flex: 1 1 auto;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--line);
-  overflow: hidden;
-}
-
-.exposure-fill {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-}
-
-.exposure-fill.exposure-low { background: var(--good-dot); }
-.exposure-fill.exposure-medium { background: var(--acc-dot); }
-.exposure-fill.exposure-high { background: var(--poor-dot); }
-
-.exposure-chip {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: 9px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 17px;
-}
-
-.exposure-chip.exposure-low { background: var(--good-bg); color: var(--good-fg); }
-.exposure-chip.exposure-medium { background: var(--acc-bg); color: var(--acc-fg); }
-.exposure-chip.exposure-high { background: var(--poor-bg); color: var(--poor-fg); }
 
 .tradeoff {
   display: inline-block;
