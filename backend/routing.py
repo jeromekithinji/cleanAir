@@ -185,11 +185,7 @@ def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> st
         drop = round((1 - clean.busy_share / fast.busy_share) * 100)
         busy_part = f"{drop}% less on busy roads" if drop > 0 else "no fewer busy roads"
 
-    exposure_part = ""
-    if clean.exposure_score < fast.exposure_score:
-        exposure_part = f", exposure {fast.exposure_score} → {clean.exposure_score}"
-
-    return f"{time_part}, {busy_part}{exposure_part}"
+    return f"{time_part}, {busy_part}"
 
 
 async def plan_routes(request: RoutesRequest) -> RoutesResponse:
