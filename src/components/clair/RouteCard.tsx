@@ -26,7 +26,9 @@ export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
         {format1(route.km)} km · {Math.round(route.busy * 100)}% on busy roads
         {isFast ? " · no air check" : " · tuned to you"}
       </span>
-      <span className="route-card-line">CO₂ 0 kg · driving it: {format1(kgSaved(route.km))} kg</span>
+      <span className="route-card-line">
+        CO₂ 0 kg · driving it: {format1((route.drivingCo2g ?? kgSaved(route.km) * 1000) / 1000)} kg
+      </span>
     </button>
   )
 }
