@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect } from "react"
+import { celebrate } from "@/lib/confetti"
 import { format1, type Mode } from "@/data/mock"
 import { gasolineLitres, phoneCharges, treeDays } from "@/lib/impact"
 import type { RouteId } from "@/lib/routing"
@@ -12,6 +16,10 @@ type ImpactCardProps = {
 }
 
 export function ImpactCard({ mode, km, route, kg, sessionKg, onDone }: ImpactCardProps) {
+  useEffect(() => {
+    celebrate()
+  }, [])
+
   return (
     <div className="impact">
       <h2 id="clair-impact-title" className="impact-title">
