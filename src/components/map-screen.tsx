@@ -1,11 +1,44 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react"
+import { AssistantChat } from "@/components/assistant-chat"
 import { RouteMap } from "@/components/route-map"
+import type {
+	AssistantHint,
+	AssistantReply,
+	AssistantRequestBody,
+	ChatMessage,
+	ParsedTrip,
+	SavedProfile,
+} from "@/lib/assistant-types"
+import { readProfile, writeProfile } from "@/lib/saved-profile"
 import { sampleTrip, searchPlaces, type SamplePlace } from "@/lib/sample-trip"
 import type { Place, RoutesResponse } from "@/lib/types"
 
 const YOUR_LOCATION = "Your location"
+
+function assistantText (reply: AssistantReply | undefined): string {
+  if (!reply) {
+    return ""
+  }
+  if (reply.kind === "clarify") {
+    return reply.question
+  }
+  if (reply.kind === "directions") {
+    return reply.explanation
+  }
+  return reply.answer
+}
+
+function priorTrip (messages: ChatMessage[]): ParsedTrip | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const reply = messages[index]?.reply
+    if (reply && "parsed" in reply) {
+      return reply.parsed
+    }
+  }
+  return null
+}
 
 type Field = "origin" | "destination"
 
@@ -22,6 +55,127 @@ export function MapScreen() {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchFocused, setSearchFocused] = useState(false)
   const [directionsOpen, setDirectionsOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [hint, setHint] = useState<AssistantHint | null>(null)
+  const [profile, setProfile] = useState<SavedProfile | null>(null)
+  const [loadingLabel, setLoadingLabel] = useState<string | null>(null)
+
+  useEffect(() => {
+    setProfile(readProfile())
+  }, [])
+
+  const applyDirections = useCallback((reply: Extract<AssistantReply, { kind: "directions" }>) => {
+    originTouched.current = true
+    setOrigin(reply.origin)
+    setOriginQuery(reply.origin.label)
+    setDestination(reply.destination)
+    setDestinationQuery(reply.destination.label)
+    setDirectionsOpen(true)
+    setSelectedId("clean")
+    setActiveField(null)
+    setSearchQuery("")
+  }, [])
+
+  async function postAssistant (body: AssistantRequestBody): Promise<AssistantReply> {
+    const response = await fetch("/api/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      throw new Error("Assistant request failed")
+    }
+    return response.json() as Promise<AssistantReply>
+  }
+
+  async function handleAssistantSend (text: string) {
+    if (!profile) {
+      return
+    }
+    const nextHint = hint
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "user", text },
+    ])
+    setLoadingLabel(
+      nextHint === "directions" ? "Planning your route…" : "Thinking…",
+    )
+    setHint(null)
+    try {
+      const reply = await postAssistant({
+        message: text,
+        profile,
+        userLocation,
+        hint: nextHint,
+        history: messages.slice(-6).map((message) => ({
+          role: message.role,
+          text: message.text ?? assistantText(message.reply),
+        })),
+        prior: priorTrip(messages),
+      })
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "assistant", reply },
+      ])
+      if (reply.kind === "directions") {
+        applyDirections(reply)
+      }
+    } catch {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          reply: {
+            kind: "clarify",
+            language: "en",
+            question: "I couldn't reach the assistant. Try again in a moment.",
+            parsed: {
+              intent: "unclear",
+              fromText: null,
+              toText: null,
+              mode: null,
+              timeOfDay: null,
+              activity: null,
+              mentionedSensitivities: [],
+              language: "en",
+            },
+          },
+        },
+      ])
+    } finally {
+      setLoadingLabel(null)
+    }
+  }
+
+  async function handleRevise (messageId: string, parsed: ParsedTrip) {
+    if (!profile) {
+      return
+    }
+    setLoadingLabel("Planning your route…")
+    try {
+      const reply = await postAssistant({
+        message: parsed.toText ?? "directions",
+        profile,
+        userLocation,
+        hint: "directions",
+        parsed,
+      })
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId ? { ...message, reply } : message,
+        ),
+      )
+      if (reply.kind === "directions") {
+        applyDirections(reply)
+      }
+    } catch {
+      setLoadingLabel(null)
+    } finally {
+      setLoadingLabel(null)
+    }
+  }
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -403,6 +557,22 @@ export function MapScreen() {
           ) : null}
         </div>
       </div>
+      <AssistantChat
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        messages={messages}
+        loadingLabel={loadingLabel}
+        hint={hint}
+        onHint={setHint}
+        profile={profile}
+        onProfile={(next) => {
+          writeProfile(next)
+          setProfile(next)
+        }}
+        onSend={handleAssistantSend}
+        onRevise={handleRevise}
+        userLocation={userLocation}
+      />
     </div>
   )
 }

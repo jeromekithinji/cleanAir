@@ -36,6 +36,7 @@ export type Scenario = {
   wind: number
   best: string
   heatWarning: boolean
+  stationName?: string
 }
 
 export const EMPTY_HEALTH: Health = { asthma: null, copd: null, heat: null }
@@ -277,7 +278,10 @@ export function airCardNote(health: Health, level: AirLevel): string {
   return `${prefix}${summary}. ${tail}`
 }
 
-export function airDirectionLine(level: AirLevel, index: number): string {
+export function airDirectionLine(level: AirLevel | "unknown", index: number | null): string {
+  if (level === "unknown" || index == null) {
+    return "Live air quality is unavailable right now."
+  }
   const extra =
     level === "poor"
       ? "Bad-air mode is on, so the cleaner route is stricter. Consider going later or taking the metro."
