@@ -113,6 +113,7 @@ class AirResponse(BaseModel):
     lon: float
     iqa: int | None = None
     level: AirCategory
+    pollutant: str | None = None
     observed_at: str | None = None
 
 

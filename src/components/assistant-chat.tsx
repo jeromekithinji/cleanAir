@@ -371,7 +371,9 @@ function ConditionsBody ({ reply }: { reply: ConditionsReply }) {
 		<div>
 			<p>{reply.answer}</p>
 			<p className="mt-2 text-xs text-zinc-600">
-				AQI {reply.conditions.aqi} · {reply.conditions.levelLabel}
+				{reply.conditions.airLevel === "unknown"
+					? "Air reading unavailable"
+					: `IQA ${reply.conditions.aqi} · ${reply.conditions.levelLabel}`}
 				{" · "}
 				Feels like {reply.conditions.feelsLikeC}°C
 				{" · "}

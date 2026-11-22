@@ -604,6 +604,11 @@ dd {
   color: var(--poor-fg);
 }
 
+.air-unknown {
+  background: var(--soft);
+  color: var(--muted);
+}
+
 .route-cards {
   margin-top: 10px;
   display: flex;
@@ -775,6 +780,13 @@ dd {
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.widget-updated {
+  margin-top: 10px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
 }
 
 .air-index {

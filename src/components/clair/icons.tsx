@@ -106,6 +106,12 @@ export const WindIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const CloudIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 18h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.5-1.5A3.5 3.5 0 0 0 7 18Z" />
+  </Svg>
+)
+
 export const SunIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="4" />

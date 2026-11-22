@@ -9,8 +9,8 @@ type DirectionsPanelProps = {
   top: number
   mode: Mode
   onMode: (mode: Mode) => void
-  airLevel: AirLevel
-  airIndex: number
+  airLevel: AirLevel | "unknown"
+  airIndex: number | null
   routes: RoutePair | null
   selected: RouteId
   onSelect: (id: RouteId) => void

@@ -1,7 +1,5 @@
 import {
   DESTINATIONS,
-  FORECAST,
-  type ForecastId,
   type Health,
   type Mode,
   type Place,
@@ -29,6 +27,7 @@ export type AssistantContext = {
   mode: Mode
   health: Health
   scenario: Scenario
+  airKnown: boolean
   explanations: string[]
 }
 
@@ -66,7 +65,6 @@ export function answerMessage(raw: string, ctx: AssistantContext): AssistantRepl
   const healthPatch = healthPatchFor(q, ctx.health)
   const nextHealth = { ...ctx.health, ...healthPatch }
   const mode = modeFor(q, ctx.mode)
-  const when = timeFor(q)
 
   if (destination) {
     const routes = buildRoutes(
@@ -85,8 +83,7 @@ export function answerMessage(raw: string, ctx: AssistantContext): AssistantRepl
       lines.push("Pick a different start and destination.")
     }
     lines.push(...healthSetLines(healthPatch))
-    lines.push(forecastSentence(when))
-    lines.push("Forecast values are sample data.")
+    lines.push(liveAirLine(ctx))
     return {
       text: lines.join("\n"),
       destinationId: destination.id,
@@ -167,42 +164,23 @@ function modeFor(q: string, current: Mode): Mode {
   return current
 }
 
-function timeFor(q: string): ForecastId | null {
-  let found: ForecastId | null = null
-  if (/\bmorning\b/.test(q)) {
-    found = "morning"
+function liveAirLine(ctx: AssistantContext): string {
+  if (!ctx.airKnown) {
+    return "I don't have a live RSQA reading yet."
   }
-  if (/\b(noon|lunch|midday)\b/.test(q)) {
-    found = "midday"
-  }
-  if (/\bafternoon\b/.test(q)) {
-    found = "afternoon"
-  }
-  if (/\b(evening|tonight)\b/.test(q)) {
-    found = "evening"
-  }
-  return found
-}
-
-function forecastSentence(focusId: ForecastId | null): string {
-  const focus = FORECAST.find((item) => item.id === focusId) ?? FORECAST[2]
-  const best = FORECAST.reduce((left, right) => (left.index <= right.index ? left : right))
-  if (focus.id === best.id) {
-    return `Air is forecast around ${focus.index} in ${focus.label}, so going ${best.advice} is best.`
-  }
-  return `Air is forecast around ${focus.index} in ${focus.label} and about ${best.index} in ${best.label}, so going ${best.advice} is best.`
+  const station = ctx.scenario.stationName ?? "the nearest station"
+  const level = levelLabel(levelForIndex(ctx.scenario.index)).toLowerCase()
+  return `Right now the IQA is ${ctx.scenario.index} (${level}) at ${station}. Best time from the weather forecast: ${ctx.scenario.best}.`
 }
 
 function conditionsText(ctx: AssistantContext): string {
+  if (!ctx.airKnown) {
+    return "I don't have a live RSQA reading yet."
+  }
   const { scenario, health } = ctx
   const level = levelForIndex(scenario.index)
-  const trend =
-    scenario.index > scenario.previous
-      ? `getting worse (up from ${scenario.previous})`
-      : scenario.index < scenario.previous
-        ? `improving (down from ${scenario.previous})`
-        : "steady"
-  let text = `Air quality is ${levelLabel(level)} (${scenario.index}) at Saint-Jean-Baptiste station, ${trend}. Main pollutant: ${scenario.pollutant}.\n`
+  const station = scenario.stationName ?? "the nearest station"
+  let text = `Air quality is ${levelLabel(level)} (${scenario.index}) at ${station}. Main pollutant: ${scenario.pollutant}.\n`
   text += `It's ${scenario.temp}°C`
   if (scenario.feels >= scenario.temp + 3) {
     text += `, feels like ${scenario.feels}°`

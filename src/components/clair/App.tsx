@@ -4,14 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import {
   CURRENT_LOCATION,
   EMPTY_HEALTH,
-  SCENARIOS,
   highestLevel,
   levelForIndex,
   placeById,
   type Health,
   type Mode,
   type Place,
+  type Scenario,
 } from "@/data/mock"
+import { toScenario, type LiveConditions } from "@/lib/live-view"
 import { answerMessage } from "@/lib/clair-assistant"
 import { kgSaved } from "@/lib/impact"
 import { buildRoutes, routeExplanations, toPath, tradeoffLine, type RouteId } from "@/lib/routing"
@@ -39,6 +40,21 @@ function subscribePhone(onChange: () => void) {
   return () => media.removeEventListener("change", onChange)
 }
 
+const EMPTY_SCENARIO: Scenario = {
+  id: 0,
+  index: 0,
+  pollutant: "—",
+  previous: 0,
+  temp: 0,
+  feels: 0,
+  sky: "—",
+  wind: 0,
+  best: "—",
+  heatWarning: false,
+}
+
+const MONTREAL = { lat: 45.50884, lon: -73.58781 }
+
 const GREETING: ChatMessage = {
   id: 0,
   role: "assistant",
@@ -49,11 +65,12 @@ export function App() {
   const mapRef = useRef<MapViewHandle>(null)
   const panelRef = useRef<HTMLElement>(null)
   const nextId = useRef(1)
+  const livePoint = useRef(MONTREAL)
 
   const [modal, setModal] = useState<ModalState>("welcome")
   const [welcomeDone, setWelcomeDone] = useState(false)
   const [health, setHealth] = useState<Health>(EMPTY_HEALTH)
-  const [scenarioIndex, setScenarioIndex] = useState(0)
+  const [live, setLive] = useState<LiveConditions | null>(null)
   const [mode, setMode] = useState<Mode>("walk")
 
   const [start, setStart] = useState<Place | null>(CURRENT_LOCATION)
@@ -80,10 +97,10 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING])
-  const [now, setNow] = useState<Date | null>(null)
 
-  const scenario = SCENARIOS[scenarioIndex]
-  const airLevel = levelForIndex(scenario.index)
+  const scenario = live ? toScenario(live) : EMPTY_SCENARIO
+  const airKnown = live?.index != null
+  const airLevel = airKnown ? levelForIndex(scenario.index) : "unknown"
   const poorAir = airLevel === "poor"
 
   const routes = useMemo(
@@ -115,16 +132,62 @@ export function App() {
     }
   }
 
-  // Clock for the air widget, client only.
   useEffect(() => {
-    const tick = () => setNow(new Date())
-    const first = window.setTimeout(tick, 0)
-    const id = window.setInterval(tick, 30_000)
+    let cancelled = false
+    const load = (lat: number, lon: number) => {
+      livePoint.current = { lat, lon }
+      const params = new URLSearchParams({ lat: String(lat), lon: String(lon) })
+      fetch(`/api/live?${params.toString()}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: LiveConditions | null) => {
+          if (!cancelled && data) {
+            setLive(data)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLive(null)
+          }
+        })
+    }
+    if (!navigator.geolocation) {
+      load(MONTREAL.lat, MONTREAL.lon)
+      return () => {
+        cancelled = true
+      }
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => load(position.coords.latitude, position.coords.longitude),
+      () => load(MONTREAL.lat, MONTREAL.lon),
+      { enableHighAccuracy: false, timeout: 4000, maximumAge: 60_000 },
+    )
     return () => {
-      window.clearTimeout(first)
-      window.clearInterval(id)
+      cancelled = true
     }
   }, [])
+
+  // Readings loaded before the weather timestamp existed have no line to show.
+  useEffect(() => {
+    if (!live || live.weatherUpdatedLabel) {
+      return
+    }
+    const params = new URLSearchParams({
+      lat: String(livePoint.current.lat),
+      lon: String(livePoint.current.lon),
+    })
+    let cancelled = false
+    fetch(`/api/live?${params.toString()}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: LiveConditions | null) => {
+        if (!cancelled && data?.weatherUpdatedLabel) {
+          setLive(data)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [live])
 
   const fitInsets = useCallback((): Insets => {
     if (isPhone) {
@@ -236,6 +299,7 @@ export function App() {
       mode,
       health,
       scenario,
+      airKnown,
       explanations,
     })
     const userMsg: ChatMessage = { id: nextId.current++, role: "user", text }
@@ -309,7 +373,7 @@ export function App() {
           mode={mode}
           onMode={setMode}
           airLevel={airLevel}
-          airIndex={scenario.index}
+          airIndex={airKnown ? scenario.index : null}
           routes={routes}
           selected={selected}
           onSelect={setSelected}
@@ -323,14 +387,12 @@ export function App() {
 
       <div className={`widgets${hasRoutes ? " has-routes" : ""}`}>
         <AirQualityCard
-          scenario={scenario}
+          live={live}
           health={health}
-          now={now}
           open={airOpen}
           onToggle={() => setAirOpen((open) => !open)}
-          onDemo={() => setScenarioIndex((i) => (i + 1) % SCENARIOS.length)}
         />
-        <WeatherCard scenario={scenario} open={weatherOpen} onToggle={() => setWeatherOpen((open) => !open)} />
+        <WeatherCard live={live} open={weatherOpen} onToggle={() => setWeatherOpen((open) => !open)} />
       </div>
 
       <MapControls

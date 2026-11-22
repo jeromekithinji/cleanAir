@@ -9,6 +9,7 @@ import {
 	type SamplePlace,
 } from "@/lib/sample-trip"
 import { buildTags, selectGuidance, type GuidanceSensitivity } from "@/lib/guidance"
+import { readSnapshot } from "@/lib/read-live"
 import type {
 	AssistantLanguage,
 	AssistantReply,
@@ -144,12 +145,13 @@ async function planDirections (
 			parsed,
 		}
 	}
-	const snapshot = dummyConditions(destination)
+	const snapshot = await readSnapshot(destination)
 	const snippets = matchedSnippets(message, parsed, body.profile, snapshot, "routes")
 	const generated = await completeJson(
 		explanationSchema,
 		[
 			"Explain a clean-air walking or biking route in one or two sentences.",
+			"conditions is live Montréal data: RSQA IQA and Open-Meteo weather. Use those numbers.",
 			"Use the route tradeoff and the guidance snippets. Do not give medical advice.",
 			parsed.language === "fr"
 				? "Reply in French."
@@ -158,6 +160,7 @@ async function planDirections (
 		].join(" "),
 		JSON.stringify({
 			tradeoff: directions.tradeoff,
+			conditions: snapshot,
 			snippets: snippets.map((snippet) => snippet.text),
 		}),
 	)
@@ -180,13 +183,14 @@ async function describeConditions (
 ): Promise<AssistantReply> {
 	const named = findPlace(parsed.toText) ?? findPlace(message)
 	const point = named ?? body.userLocation ?? SAMPLE_ORIGIN
-	const snapshot = dummyConditions(point)
+	const snapshot = await readSnapshot(point)
 	const topic = intent === "places" ? "places" : "forecast"
 	const snippets = matchedSnippets(message, parsed, body.profile, snapshot, topic)
 	const generated = await completeJson(
 		answerSchema,
 		[
-			"Answer using only the supplied guidance snippets.",
+			"Answer using only the supplied guidance snippets and the conditions object.",
+			"conditions is live Montréal data: RSQA IQA (1-25 good, 26-50 acceptable, 51 or more poor) and Open-Meteo feels-like temperature. Do not invent a different index or temperature.",
 			intent === "places"
 				? "Suggest kinds of places (indoors, shade, near water), not specific venues."
 				: "Say whether the activity is a reasonable idea right now.",
@@ -218,7 +222,7 @@ async function describeConditions (
 		parsed,
 		answer:
 			generated?.answer ??
-			templateConditionsAnswer(parsed.language, intent),
+			templateConditionsAnswer(parsed.language, intent, snapshot),
 		conditions: snapshot,
 		sources,
 		note: medicalNote(parsed.language),
@@ -245,7 +249,8 @@ function matchedSnippets (
 	const tags = buildTags(
 		{
 			airLevel: snapshot.airLevel,
-			aqhiCategory: snapshot.aqhiCategory,
+			aqhiCategory:
+				snapshot.airLevel === "unknown" ? undefined : snapshot.aqhiCategory,
 			mainPollutant: snapshot.mainPollutant,
 			heatWarning: snapshot.heatWarning,
 			feelsLikeC: snapshot.feelsLikeC,
@@ -255,23 +260,6 @@ function matchedSnippets (
 		topic,
 	)
 	return selectGuidance(tags, 5)
-}
-
-/**
- * Sample air and heat for the whole city until the live feed is connected.
- * Moderate air, ozone, and a heat warning, so guidance has something to match.
- */
-function dummyConditions (place: Place): ConditionsSnapshot {
-	return {
-		placeLabel: place.label,
-		airLevel: "acceptable",
-		aqi: 5,
-		levelLabel: "Moderate",
-		mainPollutant: "o3",
-		feelsLikeC: 31,
-		heatWarning: true,
-		aqhiCategory: "moderate",
-	}
 }
 
 function resolveOrigin (parsed: ParsedTrip, userLocation: Place | null): Place {
@@ -488,15 +476,27 @@ function templateExplanation (language: AssistantLanguage, tradeoff: string): st
 function templateConditionsAnswer (
 	language: AssistantLanguage,
 	intent: "conditions" | "places",
+	snapshot: ConditionsSnapshot,
 ): string {
+	if (snapshot.airLevel === "unknown") {
+		return language === "fr"
+			? "Je n'ai pas de lecture RSQA pour cet endroit en ce moment."
+			: "I don't have an RSQA reading for that spot right now."
+	}
+	const heat = snapshot.heatWarning
+		? language === "fr"
+			? " Un avertissement de chaleur est en vigueur."
+			: " A heat warning is in effect."
+		: ""
+	const pollutant = snapshot.mainPollutant ?? "mixed"
 	if (intent === "places") {
 		return language === "fr"
-			? "Avec l'air et la chaleur en ce moment, cherchez un endroit à l'intérieur, à l'ombre ou près de l'eau, plutôt qu'un effort intense dehors."
-			: "With the air and heat right now, look for somewhere indoors, in the shade, or near water, instead of a hard workout outside."
+			? `L'IQA est ${snapshot.aqi} (${snapshot.levelLabel}) et le ressenti est ${snapshot.feelsLikeC}°C.${heat} Cherchez un endroit à l'intérieur, à l'ombre ou près de l'eau si l'effort dehors est difficile.`
+			: `The IQA is ${snapshot.aqi} (${snapshot.levelLabel}) and it feels like ${snapshot.feelsLikeC}°C.${heat} Look for somewhere indoors, in the shade, or near water if a hard outdoor effort would be difficult.`
 	}
 	return language === "fr"
-		? "L'air est dans la zone de risque modéré et il fait chaud, avec de l'ozone. Si vous avez de l'asthme, réduisez l'effort intense ou reportez-le aux heures plus fraîches."
-		: "The air is in the moderate range and it feels hot, with ozone around. If you have asthma, ease off strenuous exercise or go when it is cooler."
+		? `L'IQA est ${snapshot.aqi} (${snapshot.levelLabel}), polluant principal ${pollutant}. Le ressenti est ${snapshot.feelsLikeC}°C.${heat}`
+		: `The IQA is ${snapshot.aqi} (${snapshot.levelLabel}), with ${pollutant} as the main pollutant. It feels like ${snapshot.feelsLikeC}°C.${heat}`
 }
 
 function medicalNote (language: AssistantLanguage): string {

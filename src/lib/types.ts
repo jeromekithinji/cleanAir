@@ -29,6 +29,7 @@ export interface AirSnapshot {
   lon: number
   iqa: number | null
   level: AirCategory
+  pollutant: string | null
   observed_at: string | null
 }
 
