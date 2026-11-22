@@ -14,6 +14,7 @@ import {
 } from "@/data/mock"
 import { planRoutes } from "@/lib/api"
 import { placeAt } from "@/lib/geocode-place"
+import type { HeatGrid } from "@/lib/heat-grid"
 import { toScenario, type LiveConditions } from "@/lib/live-view"
 import { answerMessage } from "@/lib/clair-assistant"
 import { kgSaved } from "@/lib/impact"
@@ -22,6 +23,7 @@ import type { Sensitivity } from "@/lib/types"
 import { AirQualityCard } from "./AirQualityCard"
 import { ChatAssistant, type ChatMessage } from "./ChatAssistant"
 import { DirectionsPanel } from "./DirectionsPanel"
+import { ExposureCard } from "./ExposureCard"
 import { HealthForm } from "./HealthForm"
 import { ImpactCard } from "./ImpactCard"
 import { MapControls } from "./MapControls"
@@ -114,6 +116,9 @@ export function App() {
 
   const [airOpen, setAirOpen] = useState(true)
   const [weatherOpen, setWeatherOpen] = useState(true)
+  const [exposureOn, setExposureOn] = useState(false)
+  const [exposureOpen, setExposureOpen] = useState(true)
+  const [heat, setHeat] = useState<HeatGrid | null>(null)
   const isPhone = useSyncExternalStore(
     subscribePhone,
     () => window.matchMedia(PHONE_QUERY).matches,
@@ -148,6 +153,7 @@ export function App() {
     if (routeKey) {
       setAirOpen(false)
       setWeatherOpen(false)
+      setExposureOpen(false)
     }
   }
 
@@ -234,6 +240,25 @@ export function App() {
       cancelled = true
     }
   }, [live])
+
+  // Exposure map: load the heat grid the first time it is turned on.
+  useEffect(() => {
+    if (!exposureOn || heat) {
+      return
+    }
+    let cancelled = false
+    fetch("/api/heat")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: HeatGrid | null) => {
+        if (!cancelled && data?.points) {
+          setHeat(data)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [exposureOn, heat])
 
   const fitInsets = useCallback((): Insets => {
     if (isPhone) {
@@ -446,6 +471,8 @@ export function App() {
             ? `Map of Montréal showing a fastest route (${routes.fast.minutes} min) and a cleaner-air route (${routes.clean.minutes} min) to ${dest.name}.`
             : "Map of Montréal."
         }
+        exposureOn={exposureOn}
+        heat={heat}
       />
 
       <TopBar
@@ -507,6 +534,17 @@ export function App() {
       )}
 
       <div className={`widgets${hasRoutes ? " has-routes" : ""}`}>
+        {exposureOn && (
+          <ExposureCard
+            open={exposureOpen}
+            onToggle={() => setExposureOpen((open) => !open)}
+            heatRange={
+              heat && heat.minC !== null && heat.maxC !== null
+                ? { minC: heat.minC, maxC: heat.maxC }
+                : null
+            }
+          />
+        )}
         <AirQualityCard
           live={live}
           health={health}
@@ -520,6 +558,16 @@ export function App() {
         onZoomIn={() => mapRef.current?.zoomBy(1.5)}
         onZoomOut={() => mapRef.current?.zoomBy(1 / 1.5)}
         onLocate={() => mapRef.current?.locate()}
+        exposureOn={exposureOn}
+        onExposure={() => {
+          if (!exposureOn) {
+            // Make room in the right-hand column: legend open, the others folded.
+            setExposureOpen(true)
+            setAirOpen(false)
+            setWeatherOpen(false)
+          }
+          setExposureOn(!exposureOn)
+        }}
       />
 
       <ChatAssistant

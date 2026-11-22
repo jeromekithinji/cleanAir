@@ -8,8 +8,11 @@ type RouteCardProps = {
   onSelect: () => void
 }
 
+const LEVEL_LABEL = { low: "Low", medium: "Medium", high: "High" } as const
+
 export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
   const isFast = route.id === "fast"
+  const exposure = route.exposure
   return (
     <button
       type="button"
@@ -29,6 +32,20 @@ export function RouteCard({ route, selected, onSelect }: RouteCardProps) {
       <span className="route-card-line">
         CO₂ 0 kg · driving it: {format1((route.drivingCo2g ?? kgSaved(route.km) * 1000) / 1000)} kg
       </span>
+      {exposure ? (
+        <span className="exposure-row">
+          <span className="exposure-name">Exposure score</span>
+          <span className="exposure-meter" aria-hidden="true">
+            <span
+              className={`exposure-fill exposure-${exposure.level}`}
+              style={{ width: `${Math.max(4, exposure.score)}%` }}
+            />
+          </span>
+          <span className={`exposure-chip exposure-${exposure.level}`}>
+            {exposure.score}/100 · {LEVEL_LABEL[exposure.level]}
+          </span>
+        </span>
+      ) : null}
     </button>
   )
 }

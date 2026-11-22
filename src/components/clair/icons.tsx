@@ -192,6 +192,15 @@ export const SendIcon = (p: IconProps) => (
   </Svg>
 )
 
+/** Exposure map: three waves rising off a road. */
+export const ExposureIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 8c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0" />
+    <path d="M3 13c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0" />
+    <path d="M3 18c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0" />
+  </Svg>
+)
+
 export function LocateIcon({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">

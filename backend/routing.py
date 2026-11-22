@@ -28,6 +28,7 @@ from pathlib import Path
 import httpx
 
 import co2
+import exposure
 from air import nearest_station
 from models import (
     AirCategory,
@@ -133,10 +134,13 @@ def rules_file_for(level: AirCategory) -> Path:
 
 
 
-def route_option(route_id: str, label: str, path: dict) -> RouteOption:
+def route_option(
+    route_id: str, label: str, path: dict, conditions: dict[str, float | None]
+) -> RouteOption:
     """Turn one GraphHopper path into the card the page shows."""
     share = busy_share(path)
     seconds = round(path["time"] / 1000)  # GraphHopper gives milliseconds
+    exposure_score = exposure.score(share, conditions)
     return RouteOption(
         id=route_id,
         label=label,
@@ -148,6 +152,8 @@ def route_option(route_id: str, label: str, path: dict) -> RouteOption:
         driving_co2_g=co2.driving_co2_g(path["distance"]),
         geometry=LineString(coordinates=path["points"]["coordinates"]),
         explanations=[],  # Filled in later by explain.py (another task)
+        exposure_score=exposure_score,
+        exposure_level=exposure.level(exposure_score),
     )
 
 
@@ -167,7 +173,11 @@ def tradeoff_text(fast: RouteOption, clean: RouteOption) -> str:
         drop = round((1 - clean.busy_share / fast.busy_share) * 100)
         busy_part = f"{drop}% less on busy roads" if drop > 0 else "no fewer busy roads"
 
-    return f"{time_part}, {busy_part}"
+    exposure_part = ""
+    if clean.exposure_score < fast.exposure_score:
+        exposure_part = f", exposure {fast.exposure_score} → {clean.exposure_score}"
+
+    return f"{time_part}, {busy_part}{exposure_part}"
 
 
 async def plan_routes(request: RoutesRequest) -> RoutesResponse:
@@ -179,8 +189,10 @@ async def plan_routes(request: RoutesRequest) -> RoutesResponse:
         request.origin, request.destination, profile, rules_file_for(level)
     )
 
-    fast = route_option("fast", "Fastest", fast_path)
-    clean = route_option("clean", "Cleaner air", clean_path)
+    # Air and heat at the trip start, shared by both routes' exposure scores.
+    conditions = await exposure.conditions_at(request.origin.lat, request.origin.lon)
+    fast = route_option("fast", "Fastest", fast_path, conditions)
+    clean = route_option("clean", "Cleaner air", clean_path, conditions)
 
     return RoutesResponse(
         tradeoff=tradeoff_text(fast, clean),
