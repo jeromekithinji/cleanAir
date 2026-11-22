@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# Copied from maplibre-gl on npm install. See the postinstall script.
+/public/maplibre-gl-worker.mjs
+
 # production
 /build
 
