@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect } from "react"
+import { celebrate } from "@/lib/confetti"
 import { format1, type Mode } from "@/data/mock"
 import { useAccount } from "@/lib/account"
 import { CAR_KG_PER_KM, gasolineLitres, phoneCharges, treeDays } from "@/lib/impact"
@@ -17,6 +21,11 @@ export function ImpactCard({ mode, km, route, kg, sessionKg, onDone }: ImpactCar
   const total = account.signedIn
     ? `${account.name}, your total: ${format1(account.co2Kg)} kg across ${account.trips} ${account.trips === 1 ? "trip" : "trips"}.`
     : `Total this session: ${format1(sessionKg)} kg.`
+
+  useEffect(() => {
+    celebrate()
+  }, [])
+
   return (
     <div className="impact">
       <h2 id="clair-impact-title" className="impact-title">

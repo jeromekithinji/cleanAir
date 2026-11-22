@@ -1821,3 +1821,10 @@ dd {
     animation: none;
   }
 }
+
+.footsteps { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px 16px; min-height: 200px; text-align: center; }
+.footsteps-svg { width: 290px; height: 118px; max-width: 100%; }
+.footstep { fill: #6FAE8C; opacity: 0; animation: footstep 1.8s ease-in-out infinite; }
+.footsteps-label { margin: 0; font-size: 14px; color: #5A6B63; }
+@keyframes footstep { 0% { opacity: 0; } 12% { opacity: 1; } 65% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .footstep { animation: none; opacity: 1; } }
