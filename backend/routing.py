@@ -151,13 +151,21 @@ def route_option(route_id: str, label: str, path: dict) -> RouteOption:
     )
 
 
+def format_minutes(total: int) -> str:
+    """45 -> "45 min", 60 -> "1 h", 75 -> "1 h 15 min"."""
+    if total < 60:
+        return f"{total} min"
+    hours, rest = divmod(total, 60)
+    return f"{hours} h" if rest == 0 else f"{hours} h {rest} min"
+
+
 def tradeoff_text(fast: RouteOption, clean: RouteOption, mode: TravelMode) -> str:
     """One line comparing the two routes, e.g. "+3 min, 69% less on busy roads"."""
     extra = round((clean.duration_seconds - fast.duration_seconds) / 60)
     if extra > 0:
-        time_part = f"+{extra} min"
+        time_part = f"+{format_minutes(extra)}"
     elif extra < 0:
-        time_part = f"{extra} min"  # the clean route is faster: "-2 min"
+        time_part = f"-{format_minutes(-extra)}"  # the clean route is faster: "-2 min"
     else:
         time_part = "Same time"
 
