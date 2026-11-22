@@ -1,4 +1,5 @@
 import type { Mode, Point } from "@/data/mock"
+import type { RouteOption as ApiRoute, RoutesResponse } from "@/lib/types"
 
 export const MAP_W = 1200
 export const MAP_H = 800
@@ -26,14 +27,56 @@ export type RouteOption = {
   name: string
   bubble: string
   points: Point[]
+  /** Street geometry from GraphHopper, as [lon, lat]. */
+  coordinates?: [number, number][]
   km: number
   minutes: number
   busy: number
+  drivingCo2g?: number
+}
+
+export type PlannedRoutes = {
+  routes: RoutePair
+  tradeoff: string
+  explanations: string[]
+  suggestMetro: boolean
 }
 
 export type RoutePair = {
   fast: RouteOption
   clean: RouteOption
+}
+
+function fromApiRoute(option: ApiRoute, bubble: string): RouteOption {
+  return {
+    id: option.id,
+    name: option.label,
+    bubble,
+    points: [],
+    coordinates: option.geometry.coordinates.map((pair) => [pair[0], pair[1]]),
+    km: option.distance_meters / 1000,
+    minutes: Math.max(1, Math.round(option.duration_seconds / 60)),
+    busy: option.busy_share,
+    drivingCo2g: option.driving_co2_g,
+  }
+}
+
+/** Map POST /api/route into the two cards and the line drawn on the map. */
+export function pairFromResponse(response: RoutesResponse): PlannedRoutes {
+  const fast = response.routes.find((route) => route.id === "fast")
+  const clean = response.routes.find((route) => route.id === "clean")
+  if (!fast || !clean) {
+    throw new Error("The route service did not return both routes.")
+  }
+  return {
+    routes: {
+      fast: fromApiRoute(fast, "Fastest"),
+      clean: fromApiRoute(clean, "Cleaner"),
+    },
+    tradeoff: response.tradeoff,
+    explanations: clean.explanations,
+    suggestMetro: response.suggest_metro,
+  }
 }
 
 export function samePoint(a: Point, b: Point): boolean {

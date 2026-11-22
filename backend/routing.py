@@ -45,6 +45,14 @@ from settings import CLEAN_MODEL, CLEAN_STRICT_MODEL, get_settings
 GRAPHHOPPER_PROFILE = {TravelMode.bike: "bike", TravelMode.walk: "foot"}
 
 
+class RoutingUnavailable(Exception):
+    """GraphHopper did not return a route. The request should fail."""
+
+    def __init__(self, detail: str) -> None:
+        self.detail = detail
+        super().__init__(detail)
+
+
 async def fetch_route(
     origin: Place, destination: Place, profile: str, model_file: Path | None = None
 ) -> dict:
@@ -60,10 +68,21 @@ async def fetch_route(
         body["custom_model"] = json.loads(model_file.read_text())
 
     url = f"{get_settings().graphhopper_url}/route"
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(url, json=body)
-    response.raise_for_status()
-    return response.json()["paths"][0]
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(url, json=body)
+    except httpx.HTTPError as exc:
+        raise RoutingUnavailable(
+            "GraphHopper is not running. Start it on port 8989."
+        ) from exc
+    if response.status_code >= 400:
+        raise RoutingUnavailable(
+            f"GraphHopper rejected the route ({response.status_code})."
+        )
+    paths = response.json().get("paths") or []
+    if not paths:
+        raise RoutingUnavailable("GraphHopper did not return a route.")
+    return paths[0]
 # Agreed with the team: these road types count as busy.
 BUSY_ROADS = {"motorway", "trunk", "primary", "secondary"}
 
@@ -78,13 +97,22 @@ def segment_meters(a: list[float], b: list[float]) -> float:
 def busy_share(path: dict) -> float:
     """Fraction of the route (0 to 1) that is on busy roads."""
     coords = path["points"]["coordinates"]
+    last = len(coords) - 1
     busy = total = 0.0
     for start, end, road_class in path["details"]["road_class"]:
-        meters = sum(segment_meters(coords[i], coords[i + 1]) for i in range(start, end))
+        meters = 0.0
+        for index in range(start, end):
+            if index < 0 or index >= last:
+                continue
+            meters += segment_meters(coords[index], coords[index + 1])
         total += meters
-        if road_class.lower() in BUSY_ROADS:
+        if str(road_class).lower() in BUSY_ROADS:
             busy += meters
-    return busy / total if total > 0 else 0.0
+    if total <= 0:
+        return 0.0
+    return min(1.0, busy / total)
+
+
 async def air_level_for(request: RoutesRequest) -> AirCategory:
     """The air level at the trip origin. Uses what the page sent if it sent one."""
     if request.poor_air:

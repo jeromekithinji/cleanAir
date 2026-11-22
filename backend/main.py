@@ -17,7 +17,7 @@ from models import (
     RoutesRequest,
     RoutesResponse,
 )
-from routing import plan_routes
+from routing import RoutingUnavailable, plan_routes
 from settings import get_settings
 from weather import build_conditions
 
@@ -35,6 +35,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RoutingUnavailable)
+async def routing_unavailable(_request: object, exc: RoutingUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": exc.detail})
 
 
 @app.exception_handler(FeatureNotReady)

@@ -4,7 +4,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { GeoJSONSource, LngLatBounds, Map, Marker, setWorkerUrl } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { PLACES, type Place, type Point } from "@/data/mock"
-import { pointAlong, type RouteId, type RoutePair } from "@/lib/routing"
+import { type RouteId, type RoutePair } from "@/lib/routing"
 
 export type Insets = { top: number; right: number; bottom: number; left: number }
 
@@ -13,6 +13,7 @@ export type MapViewHandle = {
   flyTo: (point: Point, zoom?: number) => void
   /** minZoom is kept so the existing caller still typechecks. */
   fitPoints: (points: Point[], padding: Insets, minZoom?: number) => void
+  fitCoordinates: (coordinates: LngLat[], padding: Insets) => void
   reset: () => void
   locate: () => void
 }
@@ -63,6 +64,13 @@ function project(point: Point, start: Place, end: Place, gps: Gps | null): LngLa
     origin.lon + t * realDx + (-realDy / realLen) * (cross / fakeLen) * scale,
     origin.lat + t * realDy + (realDx / realLen) * (cross / fakeLen) * scale,
   ]
+}
+
+function routeLine(route: RoutePair[RouteId], start: Place, end: Place, gps: Gps | null): LngLat[] {
+  if (route.coordinates && route.coordinates.length > 1) {
+    return route.coordinates
+  }
+  return route.points.map((point) => project(point, start, end, gps))
 }
 
 function knownLngLat(point: Point, gps: Gps | null): LngLat | null {
@@ -264,7 +272,7 @@ export function MapView({
                 },
                 geometry: {
                   type: "LineString" as const,
-                  coordinates: route.points.map((point) => project(point, start, destination, gps)),
+                  coordinates: routeLine(route, start, destination, gps),
                 },
               }
             })
@@ -299,8 +307,12 @@ export function MapView({
       setBubbles(
         (["fast", "clean"] as RouteId[]).map((id) => {
           const route = routes[id]
-          const mid = pointAlong(route.points, 0.5)
-          const pos = map.project(project(mid, start, destination, gps))
+          const line = routeLine(route, start, destination, gps)
+          const mid = line[Math.floor(line.length / 2)] ?? line[0]
+          if (!mid) {
+            return { id, left: 0, top: 0, text: `${route.bubble} ${route.minutes} min` }
+          }
+          const pos = map.project(mid)
           return { id, left: pos.x, top: pos.y, text: `${route.bubble} ${route.minutes} min` }
         }),
       )
@@ -342,6 +354,20 @@ export function MapView({
         }
         const bounds = new LngLatBounds()
         points.forEach((point) => bounds.extend(project(point, start, destination, gpsRef.current)))
+        map.fitBounds(bounds, {
+          padding: clampPadding(map, pad),
+          absolutePadding: true,
+          maxZoom: 15,
+          duration: 700,
+        })
+      },
+      fitCoordinates(coordinates, pad) {
+        const map = mapRef.current
+        if (!map || coordinates.length === 0) {
+          return
+        }
+        const bounds = new LngLatBounds()
+        coordinates.forEach((lngLat) => bounds.extend(lngLat))
         map.fitBounds(bounds, {
           padding: clampPadding(map, pad),
           absolutePadding: true,

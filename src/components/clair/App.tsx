@@ -1,21 +1,24 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import {
   CURRENT_LOCATION,
   EMPTY_HEALTH,
-  highestLevel,
   levelForIndex,
   placeById,
   type Health,
+  type Level,
   type Mode,
   type Place,
   type Scenario,
 } from "@/data/mock"
+import { planRoutes } from "@/lib/api"
+import { placeAt } from "@/lib/geocode-place"
 import { toScenario, type LiveConditions } from "@/lib/live-view"
 import { answerMessage } from "@/lib/clair-assistant"
 import { kgSaved } from "@/lib/impact"
-import { buildRoutes, routeExplanations, toPath, tradeoffLine, type RouteId } from "@/lib/routing"
+import { pairFromResponse, type RouteId, type RoutePair } from "@/lib/routing"
+import type { Sensitivity } from "@/lib/types"
 import { AirQualityCard } from "./AirQualityCard"
 import { ChatAssistant, type ChatMessage } from "./ChatAssistant"
 import { DirectionsPanel } from "./DirectionsPanel"
@@ -55,6 +58,20 @@ const EMPTY_SCENARIO: Scenario = {
 
 const MONTREAL = { lat: 45.50884, lon: -73.58781 }
 
+function sensitivity(level: Level | null): Sensitivity {
+  if (level === 3) {
+    return "high"
+  }
+  if (level === 2) {
+    return "medium"
+  }
+  return "low"
+}
+
+function sameSpot(a: Place, b: Place): boolean {
+  return Math.abs(a.lat - b.lat) < 0.00005 && Math.abs(a.lon - b.lon) < 0.00005
+}
+
 const GREETING: ChatMessage = {
   id: 0,
   role: "assistant",
@@ -66,6 +83,8 @@ export function App() {
   const panelRef = useRef<HTMLElement>(null)
   const nextId = useRef(1)
   const livePoint = useRef(MONTREAL)
+  const gpsPlace = useRef<Place | null>(null)
+  const startChosen = useRef(false)
 
   const [modal, setModal] = useState<ModalState>("welcome")
   const [welcomeDone, setWelcomeDone] = useState(false)
@@ -73,13 +92,21 @@ export function App() {
   const [live, setLive] = useState<LiveConditions | null>(null)
   const [mode, setMode] = useState<Mode>("walk")
 
-  const [start, setStart] = useState<Place | null>(CURRENT_LOCATION)
+  const [start, setStart] = useState<Place | null>(null)
   const [dest, setDest] = useState<Place | null>(null)
-  const [startText, setStartText] = useState(CURRENT_LOCATION.name)
+  const [startText, setStartText] = useState("")
+  const [locating, setLocating] = useState(true)
+  const [locationMessage, setLocationMessage] = useState<string | null>(null)
   const [destText, setDestText] = useState("")
   const [twoFields, setTwoFields] = useState(false)
   const [swapped, setSwapped] = useState(false)
 
+  const [routes, setRoutes] = useState<RoutePair | null>(null)
+  const [tradeoff, setTradeoff] = useState("")
+  const [explanations, setExplanations] = useState<string[]>([])
+  const [suggestMetro, setSuggestMetro] = useState(false)
+  const [routesLoading, setRoutesLoading] = useState(false)
+  const [routeError, setRouteError] = useState<string | null>(null)
   const [selected, setSelected] = useState<RouteId>("clean")
   const [tripActive, setTripActive] = useState(false)
   const [trip, setTrip] = useState<Trip | null>(null)
@@ -101,18 +128,10 @@ export function App() {
   const scenario = live ? toScenario(live) : EMPTY_SCENARIO
   const airKnown = live?.index != null
   const airLevel = airKnown ? levelForIndex(scenario.index) : "unknown"
-  const poorAir = airLevel === "poor"
 
-  const routes = useMemo(
-    () => (start && dest ? buildRoutes(start, dest, mode, highestLevel(health), poorAir) : null),
-    [start, dest, mode, health, poorAir],
-  )
-  const routeKey = routes ? `${toPath(routes.fast.points)}|${toPath(routes.clean.points)}` : ""
-  const explanations = useMemo(
-    () => (routes ? routeExplanations(routes.fast, health, poorAir) : []),
-    [routes, health, poorAir],
-  )
-  const tradeoff = routes ? tradeoffLine(routes.fast, routes.clean) : ""
+  const routeKey = routes
+    ? `${routes.fast.minutes}|${routes.fast.km}|${routes.clean.minutes}|${routes.clean.km}|${routes.fast.coordinates?.length ?? 0}`
+    : ""
   const panelVisible = dest !== null || (twoFields && swapped && start === null)
   const panelTop = twoFields ? 134 : 70
 
@@ -150,16 +169,43 @@ export function App() {
           }
         })
     }
+    const useHere = (lat: number, lon: number) => {
+      const place = placeAt("Your location", lon, lat, "Current position", "your-location")
+      gpsPlace.current = place
+      if (!cancelled && !startChosen.current) {
+        setStart(place)
+        setStartText(place.name)
+        setLocationMessage(null)
+      }
+    }
     if (!navigator.geolocation) {
+      if (!cancelled) {
+        setLocating(false)
+        setLocationMessage("Location is unavailable. Choose a starting point.")
+      }
       load(MONTREAL.lat, MONTREAL.lon)
       return () => {
         cancelled = true
       }
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => load(position.coords.latitude, position.coords.longitude),
-      () => load(MONTREAL.lat, MONTREAL.lon),
-      { enableHighAccuracy: false, timeout: 4000, maximumAge: 60_000 },
+      (position) => {
+        useHere(position.coords.latitude, position.coords.longitude)
+        if (!cancelled) {
+          setLocating(false)
+        }
+        load(position.coords.latitude, position.coords.longitude)
+      },
+      () => {
+        if (!cancelled && !startChosen.current) {
+          setLocationMessage("Location is unavailable. Choose a starting point.")
+        }
+        if (!cancelled) {
+          setLocating(false)
+        }
+        load(MONTREAL.lat, MONTREAL.lon)
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
     )
     return () => {
       cancelled = true
@@ -198,13 +244,77 @@ export function App() {
     return { top: 66, right: 156, bottom: 66, left: 12 + 456 + 24 }
   }, [isPhone, panelTop])
 
+  useEffect(() => {
+    if (!start || !dest || sameSpot(start, dest)) {
+      setRoutes(null)
+      setTradeoff("")
+      setExplanations([])
+      setSuggestMetro(false)
+      setRouteError(null)
+      setRoutesLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setRoutes(null)
+    setTradeoff("")
+    setExplanations([])
+    setSuggestMetro(false)
+    setRouteError(null)
+    setRoutesLoading(true)
+    planRoutes(
+      { label: start.name, lat: start.lat, lon: start.lon },
+      { label: dest.name, lat: dest.lat, lon: dest.lon },
+      {
+        asthma: sensitivity(health.asthma),
+        copd: sensitivity(health.copd),
+        heat: sensitivity(health.heat),
+        mode,
+      },
+      false,
+      airKnown ? airLevel : undefined,
+      controller.signal,
+    )
+      .then((response) => {
+        const planned = pairFromResponse(response)
+        setRoutes(planned.routes)
+        setTradeoff(planned.tradeoff)
+        setExplanations(planned.explanations)
+        setSuggestMetro(planned.suggestMetro)
+        setRoutesLoading(false)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        setRoutes(null)
+        setTradeoff("")
+        setExplanations([])
+        setSuggestMetro(false)
+        setRouteError(error instanceof Error ? error.message : "Could not find routes.")
+        setRoutesLoading(false)
+      })
+    return () => controller.abort()
+  }, [start, dest, mode, health, airKnown, airLevel])
+
   // New pair of routes: fit the camera around both.
   useEffect(() => {
     if (!routes) {
       return
     }
+    const coordinates = [
+      ...(routes.fast.coordinates ?? []),
+      ...(routes.clean.coordinates ?? []),
+    ]
     const frame = requestAnimationFrame(() => {
-      mapRef.current?.fitPoints([...routes.fast.points, ...routes.clean.points], fitInsets(), isPhone ? 0.7 : undefined)
+      if (coordinates.length > 1) {
+        mapRef.current?.fitCoordinates(coordinates, fitInsets())
+        return
+      }
+      mapRef.current?.fitPoints(
+        [...routes.fast.points, ...routes.clean.points],
+        fitInsets(),
+        isPhone ? 0.7 : undefined,
+      )
     })
     return () => cancelAnimationFrame(frame)
     // Only when the geometry changes, not on every minute or selection change.
@@ -239,15 +349,16 @@ export function App() {
       setSwapped(false)
       setSelected("clean")
       setTripActive(false)
-      if (!start) {
-        setStart(CURRENT_LOCATION)
-        setStartText(CURRENT_LOCATION.name)
+      if (!start && gpsPlace.current) {
+        setStart(gpsPlace.current)
+        setStartText(gpsPlace.current.name)
       }
     },
     [start],
   )
 
   const pickStart = (place: Place) => {
+    startChosen.current = true
     setStart(place)
     setStartText(place.name)
     setSwapped(false)
@@ -268,8 +379,9 @@ export function App() {
   const clear = () => {
     setDest(null)
     setDestText("")
-    setStart(CURRENT_LOCATION)
-    setStartText(CURRENT_LOCATION.name)
+    startChosen.current = false
+    setStart(gpsPlace.current)
+    setStartText(gpsPlace.current?.name ?? "")
     setTwoFields(false)
     setSwapped(false)
     setTripActive(false)
@@ -295,12 +407,12 @@ export function App() {
 
   const send = (text: string) => {
     const reply = answerMessage(text, {
-      start: start ?? CURRENT_LOCATION,
+      start: start ?? gpsPlace.current ?? CURRENT_LOCATION,
       mode,
       health,
       scenario,
       airKnown,
-      explanations,
+      explanations: explanations.length ? explanations : tradeoff ? [tradeoff] : [],
     })
     const userMsg: ChatMessage = { id: nextId.current++, role: "user", text }
     const botMsg: ChatMessage = { id: nextId.current++, role: "assistant", text: reply.text, chips: reply.chips }
@@ -344,6 +456,7 @@ export function App() {
           startPlace: start,
           destPlace: dest,
           onStartText: (value) => {
+            startChosen.current = true
             setStartText(value)
             if (!value) {
               setStart(null)
@@ -379,6 +492,14 @@ export function App() {
           onSelect={setSelected}
           tradeoff={tradeoff}
           explanations={explanations}
+          suggestMetro={suggestMetro}
+          loading={routesLoading || (Boolean(dest) && !start && locating)}
+          loadingLabel={
+            !start && locating
+              ? "Finding your location…"
+              : "Finding the fastest and cleaner routes…"
+          }
+          error={routeError ?? (!start && !locating ? locationMessage : null)}
           tripActive={tripActive}
           onTrip={onTrip}
           onClear={clear}
