@@ -857,13 +857,17 @@ dd {
 .tradeoff {
   display: inline-block;
   margin-top: 10px;
-  margin-bottom: 12px;
   padding: 3px 10px;
   border-radius: 10px;
   background: var(--good-bg);
   color: var(--good-fg);
   font-size: 13px;
   font-weight: 700;
+}
+
+/* Start / Finish trip: always a gap above, whether or not the tradeoff line shows. */
+.trip-btn {
+  margin-top: 12px;
 }
 
 .why {
@@ -987,7 +991,7 @@ dd {
 }
 
 .widget-source {
-  font-size: 11px;
+  font-size: 9.5px;
   font-style: italic;
   color: var(--muted);
   white-space: nowrap;

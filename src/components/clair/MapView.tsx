@@ -2,7 +2,11 @@
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { GeoJSONSource, LngLatBounds, Map, Marker, setWorkerUrl } from "maplibre-gl"
-import type { ExpressionSpecification, FilterSpecification } from "@maplibre/maplibre-gl-style-spec"
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LineLayerSpecification,
+} from "@maplibre/maplibre-gl-style-spec"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { PLACES, type Place, type Point } from "@/data/mock"
 import type { HeatGrid } from "@/lib/heat-grid"
@@ -42,6 +46,32 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty"
 const MONTREAL: LngLat = [-73.59, 45.52]
 const FAST = "#1a73e8"
 const CLEAN = "#1B7A62"
+/** Darker edge around each route line, so it stands out from the map's yellow roads. */
+const FAST_CASING = "#0B4FAE"
+const CLEAN_CASING = "#0B4B3B"
+
+/** White chevron drawn along the selected route to show the direction of travel. */
+function routeArrowImage(): { width: number; height: number; data: Uint8ClampedArray } {
+  const size = 48
+  const canvas = document.createElement("canvas")
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext("2d")
+  if (ctx) {
+    ctx.strokeStyle = "#ffffff"
+    ctx.lineWidth = 7
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    // Points right: MapLibre turns it to follow the line.
+    ctx.beginPath()
+    ctx.moveTo(17, 12)
+    ctx.lineTo(31, 24)
+    ctx.lineTo(17, 36)
+    ctx.stroke()
+  }
+  const pixels = ctx?.getImageData(0, 0, size, size).data ?? new Uint8ClampedArray(size * size * 4)
+  return { width: size, height: size, data: pixels }
+}
 
 function anchor(place: Place, gps: Gps | null): Gps {
   if (place.id === "current" && gps) {
@@ -308,20 +338,65 @@ export function MapView({
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       })
+      const routeLayout: LineLayerSpecification["layout"] = {
+        "line-cap": "round",
+        "line-join": "round",
+        "line-sort-key": ["get", "rank"],
+      }
+      // Soft shadow under the selected route, so it lifts off the map.
+      map.addLayer({
+        id: "routes-shadow",
+        type: "line",
+        source: "routes",
+        layout: routeLayout,
+        paint: {
+          "line-color": "#10201A",
+          "line-width": ["+", ["get", "width"], 10],
+          "line-blur": 8,
+          "line-translate": [0, 2],
+          "line-opacity": ["case", ["get", "active"], 0.22, 0],
+        },
+      })
+      // Darker edge around both routes.
+      map.addLayer({
+        id: "routes-casing",
+        type: "line",
+        source: "routes",
+        layout: routeLayout,
+        paint: {
+          "line-color": ["get", "casing"],
+          "line-width": ["+", ["get", "width"], 4],
+          "line-opacity": ["get", "opacity"],
+        },
+      })
       map.addLayer({
         id: "routes",
         type: "line",
         source: "routes",
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-          "line-sort-key": ["get", "rank"],
-        },
+        layout: routeLayout,
         paint: {
           "line-color": ["get", "color"],
           "line-width": ["get", "width"],
           "line-opacity": ["get", "opacity"],
         },
+      })
+      // Direction arrows on the selected route only.
+      map.addImage("route-arrow", routeArrowImage(), { pixelRatio: 2 })
+      map.addLayer({
+        id: "routes-arrows",
+        type: "symbol",
+        source: "routes",
+        filter: ["==", ["get", "active"], true],
+        layout: {
+          "symbol-placement": "line",
+          "symbol-spacing": 60,
+          "icon-image": "route-arrow",
+          "icon-size": 0.8,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "icon-rotation-alignment": "map",
+        },
+        paint: { "icon-opacity": 0.95 },
       })
       map.on("click", "routes", (event) => {
         const id = event.features?.[0]?.properties?.id
@@ -463,8 +538,10 @@ export function MapView({
                 properties: {
                   id,
                   rank: active ? 2 : 1,
+                  active,
                   color: id === "clean" ? CLEAN : FAST,
-                  width: active ? 7 : 5,
+                  casing: id === "clean" ? CLEAN_CASING : FAST_CASING,
+                  width: active ? 8 : 5,
                   opacity: active ? 1 : 0.55,
                 },
                 geometry: {

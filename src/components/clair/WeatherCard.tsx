@@ -24,7 +24,7 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
   const wind = live?.windKmh == null ? null : Math.round(live.windKmh)
   const hotter = temp != null && feels != null && feels - temp >= 3
   const place = live?.weatherSource === "unavailable" ? "Weather unavailable" : "Montréal"
-  const source = live?.weatherSource === "live" ? "Open-Meteo · live" : "Open-Meteo"
+  const source = live?.weatherSource === "live" ? "Source: Open-Meteo · live" : "Source: Open-Meteo"
   return (
     <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather and timing">
       <div className="widget-head">
