@@ -11,6 +11,7 @@ import {
   LEVEL_LABEL,
 } from "@/data/mock"
 import { buildRoutes, tradeoffLine, routeExplanations } from "@/lib/routing"
+import { greetingReply } from "@/lib/greeting"
 
 export type ChatChip = { label: string; message: string }
 
@@ -44,6 +45,10 @@ const EXAMPLE = 'Try "bike to Atwater Market this afternoon".'
 export function answerMessage(raw: string, ctx: AssistantContext): AssistantReply {
   const text = raw.trim()
   const q = text.toLowerCase()
+  const greeting = greetingReply(text)
+  if (greeting) {
+    return { text: greeting }
+  }
 
   if (isPhrase(q, ["get directions"])) {
     return {

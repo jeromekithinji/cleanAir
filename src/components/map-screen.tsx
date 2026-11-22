@@ -131,6 +131,8 @@ export function MapScreen() {
             kind: "clarify",
             language: "en",
             question: "I couldn't reach the assistant. Try again in a moment.",
+            sources: [],
+            note: "",
             parsed: {
               intent: "unclear",
               fromText: null,

@@ -1114,6 +1114,19 @@ dd {
   color: var(--on-primary);
 }
 
+.msg-pending .msg-bubble {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.msg-note {
+  max-width: 88%;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .msg-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1147,6 +1160,11 @@ dd {
   color: var(--text);
   font-size: 13px;
   font-weight: 700;
+}
+
+.option-btn.is-selected {
+  background: var(--pop);
+  color: var(--on-primary);
 }
 
 .chat-form {

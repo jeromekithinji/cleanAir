@@ -14,8 +14,16 @@ import {
 } from "@/data/mock"
 import { planRoutes } from "@/lib/api"
 import { placeAt } from "@/lib/geocode-place"
+import { SAMPLE_PLACES } from "@/lib/sample-trip"
 import { toScenario, type LiveConditions } from "@/lib/live-view"
+import {
+  replyText,
+  type AssistantHint,
+  type AssistantReply as GroqReply,
+  type AssistantTrip,
+} from "@/lib/assistant-types"
 import { answerMessage } from "@/lib/clair-assistant"
+import { greetingReply } from "@/lib/greeting"
 import { kgSaved } from "@/lib/impact"
 import { pairFromResponse, type RouteId, type RoutePair } from "@/lib/routing"
 import type { Sensitivity } from "@/lib/types"
@@ -68,8 +76,42 @@ function sensitivity(level: Level | null): Sensitivity {
   return "low"
 }
 
+function sensitivityOrNull(level: Level | null): Sensitivity | null {
+  if (level === 3) {
+    return "high"
+  }
+  if (level === 2) {
+    return "medium"
+  }
+  if (level === 1) {
+    return "low"
+  }
+  return null
+}
+
 function sameSpot(a: Place, b: Place): boolean {
   return Math.abs(a.lat - b.lat) < 0.00005 && Math.abs(a.lon - b.lon) < 0.00005
+}
+
+function nearestPlaces(lat: number, lon: number): string[] {
+  return [...SAMPLE_PLACES]
+    .map((place) => ({
+      label: place.label,
+      km: distanceKm(lat, lon, place.lat, place.lon),
+    }))
+    .filter((place) => place.km > 0.3)
+    .sort((a, b) => a.km - b.km)
+    .slice(0, 3)
+    .map((place) => place.label)
+}
+
+function distanceKm(lat: number, lon: number, otherLat: number, otherLon: number): number {
+  const toRad = (degrees: number) => degrees * Math.PI / 180
+  const dLat = toRad(otherLat - lat)
+  const dLon = toRad(otherLon - lon)
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat)) * Math.cos(toRad(otherLat)) * Math.sin(dLon / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(a)))
 }
 
 const GREETING: ChatMessage = {
@@ -82,6 +124,7 @@ export function App() {
   const mapRef = useRef<MapViewHandle>(null)
   const panelRef = useRef<HTMLElement>(null)
   const nextId = useRef(1)
+  const chatBusyRef = useRef(false)
   const livePoint = useRef(MONTREAL)
   const gpsPlace = useRef<Place | null>(null)
   const startChosen = useRef(false)
@@ -124,6 +167,7 @@ export function App() {
   const [chatOpen, setChatOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([GREETING])
+  const [chatBusy, setChatBusy] = useState(false)
 
   const scenario = live ? toScenario(live) : EMPTY_SCENARIO
   const airKnown = live?.index != null
@@ -405,27 +449,185 @@ export function App() {
     setModal("impact")
   }
 
-  const send = (text: string) => {
-    const reply = answerMessage(text, {
-      start: start ?? gpsPlace.current ?? CURRENT_LOCATION,
-      mode,
-      health,
-      scenario,
-      airKnown,
-      explanations: explanations.length ? explanations : tradeoff ? [tradeoff] : [],
+  const screenTrip = (): AssistantTrip | null => {
+    const origin = start ?? gpsPlace.current
+    if (!routes || !dest || !origin) {
+      return null
+    }
+    const pack = (route: RoutePair["fast"]) => ({
+      id: route.id,
+      label: route.name,
+      durationSeconds: route.minutes * 60,
+      distanceMeters: Math.round(route.km * 1000),
+      busyShare: route.busy,
+      mainStreets: null,
+      shadeShare: null,
     })
-    const userMsg: ChatMessage = { id: nextId.current++, role: "user", text }
-    const botMsg: ChatMessage = { id: nextId.current++, role: "assistant", text: reply.text, chips: reply.chips }
-    setMessages((list) => [...list, userMsg, botMsg])
-    if (reply.health) {
-      setHealth((current) => ({ ...current, ...reply.health }))
+    return {
+      origin: { label: origin.name, lat: origin.lat, lon: origin.lon },
+      destination: { label: dest.name, lat: dest.lat, lon: dest.lon },
+      mode,
+      strictMode: airLevel === "poor",
+      tradeoff,
+      routes: [pack(routes.fast), pack(routes.clean)],
     }
-    if (reply.mode) {
-      setMode(reply.mode)
+  }
+
+  const applyGroqDirections = (reply: Extract<GroqReply, { kind: "directions" }>) => {
+    if (reply.parsed.mode) {
+      setMode(reply.parsed.mode)
     }
-    if (reply.destinationId) {
-      planTo(placeById(reply.destinationId))
+    const here = /your location|my location|^here$/i.test(reply.origin.label)
+    if (!here) {
+      const originPlace = placeAt(
+        reply.origin.label,
+        reply.origin.lon,
+        reply.origin.lat,
+        "",
+        "chat-origin",
+      )
+      startChosen.current = true
+      setStart(originPlace)
+      setStartText(originPlace.name)
+    } else if (!start && gpsPlace.current) {
+      setStart(gpsPlace.current)
+      setStartText(gpsPlace.current.name)
     }
+    const destPlace = placeAt(
+      reply.destination.label,
+      reply.destination.lon,
+      reply.destination.lat,
+      "",
+      "chat-dest",
+    )
+    setDest(destPlace)
+    setDestText(destPlace.name)
+    setTwoFields(true)
+    setSelected("clean")
+    setTripActive(false)
+  }
+
+  const send = (text: string, hint?: AssistantHint | null) => {
+    if (chatBusyRef.current) {
+      return
+    }
+    chatBusyRef.current = true
+    const userId = nextId.current++
+    const pendingId = nextId.current++
+    const history = messages
+      .filter((message) => !message.pending)
+      .slice(-6)
+      .map((message) => ({ role: message.role, text: message.text }))
+    const prior = [...messages].reverse().find((message) => message.parsed)?.parsed ?? null
+    const origin = start ?? gpsPlace.current
+    setMessages((list) => [
+      ...list,
+      { id: userId, role: "user", text },
+      { id: pendingId, role: "assistant", text: "Thinking…", pending: true },
+    ])
+    setChatBusy(true)
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => controller.abort(), 15000)
+    fetch("/api/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        message: text,
+        profile: {
+          asthma: sensitivityOrNull(health.asthma),
+          copd: sensitivityOrNull(health.copd),
+          heat: sensitivityOrNull(health.heat),
+          mode,
+        },
+        userLocation: origin
+          ? { label: origin.name, lat: origin.lat, lon: origin.lon }
+          : null,
+        hint: hint ?? null,
+        prior,
+        history,
+        trip: screenTrip(),
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("assistant")
+        }
+        return response.json() as Promise<GroqReply>
+      })
+      .then((reply) => {
+        setMessages((list) => list.map((message) => (
+          message.id === pendingId
+            ? {
+                id: pendingId,
+                role: "assistant" as const,
+                text: replyText(reply),
+                sources: reply.sources,
+                note: reply.note,
+                parsed: reply.parsed,
+                hideAdvice: greetingReply(text) !== null,
+              }
+            : message
+        )))
+        if (reply.kind === "directions") {
+          applyGroqDirections(reply)
+        } else if (reply.parsed.mode) {
+          setMode(reply.parsed.mode)
+        }
+      })
+      .catch(() => {
+        const local = answerMessage(text, {
+          start: origin ?? CURRENT_LOCATION,
+          mode,
+          health,
+          scenario,
+          airKnown,
+          explanations: explanations.length ? explanations : tradeoff ? [tradeoff] : [],
+        })
+        setMessages((list) => list.map((message) => (
+          message.id === pendingId
+            ? { id: pendingId, role: "assistant", text: local.text, chips: local.chips, hideAdvice: greetingReply(text) !== null }
+            : message
+        )))
+        if (local.health) {
+          setHealth((current) => ({ ...current, ...local.health }))
+        }
+        if (local.mode) {
+          setMode(local.mode)
+        }
+        if (local.destinationId) {
+          planTo(placeById(local.destinationId))
+        }
+      })
+      .finally(() => {
+        window.clearTimeout(timer)
+        chatBusyRef.current = false
+        setChatBusy(false)
+      })
+  }
+
+  const suggestNearby = () => {
+    const here = start ?? gpsPlace.current
+    const picks = nearestPlaces(here?.lat ?? MONTREAL.lat, here?.lon ?? MONTREAL.lon)
+    setMessages((list) => {
+      const last = list[list.length - 1]
+      if (last?.text === "Three places near you:") {
+        return list
+      }
+      return [
+        ...list,
+        {
+          id: nextId.current++,
+          role: "assistant" as const,
+          text: "Three places near you:",
+          hideAdvice: true,
+          chips: picks.map((name) => ({
+            label: name,
+            message: `I want to go to ${name}`,
+          })),
+        },
+      ]
+    })
   }
 
   const hasRoutes = routes !== null
@@ -527,7 +729,13 @@ export function App() {
         onOpen={() => setChatOpen(true)}
         onClose={() => setChatOpen(false)}
         messages={messages}
+        busy={chatBusy}
         onSend={send}
+        onPick={(next) => {
+          if (next === "places") {
+            suggestNearby()
+          }
+        }}
       />
 
       {modal === "welcome" && (
