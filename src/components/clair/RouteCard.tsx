@@ -9,6 +9,13 @@ type RouteCardProps = {
   showBusy: boolean
 }
 
+/** Time spent on busy roads, e.g. "2 min in busy areas". */
+function busyTime(route: RouteOption): string {
+  if (route.busy <= 0) return "no busy areas"
+  const minutes = Math.round(route.minutes * route.busy)
+  return minutes < 1 ? "under 1 min in busy areas" : `${minutes} min in busy areas`
+}
+
 export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProps) {
   const isFast = route.id === "fast"
   return (
@@ -24,7 +31,7 @@ export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProp
         <span className="route-card-min">{route.minutes} min</span>
       </span>
       <span className="route-card-line">
-        {format1(route.km)} km{showBusy ? ` · ${Math.round(route.busy * 100)}% on busy roads` : ""}
+        {format1(route.km)} km{showBusy ? ` · ${busyTime(route)}` : ""}
         {isFast ? " · no air check" : " · best route"}
       </span>
       <span className="route-card-line">
