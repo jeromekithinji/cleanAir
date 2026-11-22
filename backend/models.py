@@ -97,6 +97,9 @@ class RouteOption(BaseModel):
     driving_co2_g: float
     geometry: LineString
     explanations: list[str]
+    # 0-100, lower is better: busy roads, air and heat. See backend/exposure.py.
+    exposure_score: int = Field(default=0, ge=0, le=100)
+    exposure_level: Literal["low", "medium", "high"] = "low"
 
 
 class RoutesResponse(BaseModel):

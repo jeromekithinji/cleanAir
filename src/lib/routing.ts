@@ -1,5 +1,5 @@
 import type { Mode, Point } from "@/data/mock"
-import type { RouteOption as ApiRoute, RoutesResponse } from "@/lib/types"
+import type { RouteOption as ApiRoute, ExposureLevel, RoutesResponse } from "@/lib/types"
 
 export const MAP_W = 1200
 export const MAP_H = 800
@@ -33,6 +33,8 @@ export type RouteOption = {
   minutes: number
   busy: number
   drivingCo2g?: number
+  /** Exposure score from the backend, 0-100 (lower is better). */
+  exposure?: { score: number; level: ExposureLevel }
 }
 
 export type PlannedRoutes = {
@@ -58,6 +60,10 @@ function fromApiRoute(option: ApiRoute, bubble: string): RouteOption {
     minutes: Math.max(1, Math.round(option.duration_seconds / 60)),
     busy: option.busy_share,
     drivingCo2g: option.driving_co2_g,
+    exposure:
+      typeof option.exposure_score === "number"
+        ? { score: option.exposure_score, level: option.exposure_level ?? "low" }
+        : undefined,
   }
 }
 

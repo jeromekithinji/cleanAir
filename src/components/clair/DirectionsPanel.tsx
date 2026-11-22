@@ -67,7 +67,7 @@ export function DirectionsPanel(props: DirectionsPanelProps) {
               ))}
             </ul>
           ) : null}
-          <button type="button" className="btn-primary" onClick={props.onTrip}>
+          <button type="button" className="btn-primary trip-btn" onClick={props.onTrip}>
             {props.tripActive ? "Finish trip" : "Start trip"}
           </button>
         </>

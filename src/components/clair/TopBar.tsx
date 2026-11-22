@@ -13,9 +13,17 @@ type TopBarProps = {
   accountOpen: boolean
   onAccountToggle: () => void
   onAccountClose: () => void
+  onSignedOut: () => void
 }
 
-export function TopBar({ search, onHealth, accountOpen, onAccountToggle, onAccountClose }: TopBarProps) {
+export function TopBar({
+  search,
+  onHealth,
+  accountOpen,
+  onAccountToggle,
+  onAccountClose,
+  onSignedOut,
+}: TopBarProps) {
   return (
     <header className="topbar">
       <div className="badge" aria-label={APP_NAME} role="img">
@@ -27,7 +35,13 @@ export function TopBar({ search, onHealth, accountOpen, onAccountToggle, onAccou
         <PulseIcon size={20} />
         <span className="health-btn-label">Health info</span>
       </button>
-      <AccountMenu open={accountOpen} onToggle={onAccountToggle} onClose={onAccountClose} />
+      <AccountMenu
+        open={accountOpen}
+        onToggle={onAccountToggle}
+        onClose={onAccountClose}
+        onEditHealth={onHealth}
+        onSignedOut={onSignedOut}
+      />
     </header>
   )
 }

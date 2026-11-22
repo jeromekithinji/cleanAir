@@ -360,8 +360,8 @@ dd {
   position: absolute;
   top: 54px;
   right: 0;
-  width: 240px;
-  padding: 12px 14px;
+  width: 280px;
+  padding: 14px;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -369,6 +369,128 @@ dd {
   font-size: 14px;
   color: var(--text);
 }
+
+/* ---------- Profile (prototype account) ---------- */
+
+.account-initials {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--pop);
+  color: var(--on-primary);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.profile-who {
+  min-width: 0;
+}
+
+.profile-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.profile-co2 {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--good-bg);
+  color: var(--good-fg);
+}
+
+.profile-co2-label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.profile-co2-value {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.profile-co2-unit {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.profile-co2-detail {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.profile-row {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 44px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-row-action {
+  font-weight: 500;
+  color: var(--pop);
+}
+
+.profile-signout {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--poor-fg);
+}
+
+.profile-signin {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-submit {
+  margin-top: 12px;
+}
+
+
 
 /* ---------- Search ---------- */
 
@@ -686,6 +808,52 @@ dd {
   line-height: 17px;
 }
 
+/* Exposure score row on a route card */
+.exposure-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.exposure-name {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.exposure-meter {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.exposure-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.exposure-fill.exposure-low { background: var(--good-dot); }
+.exposure-fill.exposure-medium { background: var(--acc-dot); }
+.exposure-fill.exposure-high { background: var(--poor-dot); }
+
+.exposure-chip {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 17px;
+}
+
+.exposure-chip.exposure-low { background: var(--good-bg); color: var(--good-fg); }
+.exposure-chip.exposure-medium { background: var(--acc-bg); color: var(--acc-fg); }
+.exposure-chip.exposure-high { background: var(--poor-bg); color: var(--poor-fg); }
+
 .tradeoff {
   display: inline-block;
   margin-top: 10px;
@@ -695,6 +863,11 @@ dd {
   color: var(--good-fg);
   font-size: 13px;
   font-weight: 700;
+}
+
+/* Start / Finish trip: always a gap above, whether or not the tradeoff line shows. */
+.trip-btn {
+  margin-top: 12px;
 }
 
 .why {
@@ -802,6 +975,26 @@ dd {
   font-size: 11px;
   font-style: italic;
   color: var(--muted);
+}
+
+/* Last updated on the left, data source on the right */
+.widget-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.widget-footer .widget-updated {
+  margin-top: 0;
+}
+
+.widget-source {
+  font-size: 9.5px;
+  font-style: italic;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .air-index {
@@ -1021,6 +1214,68 @@ dd {
   box-shadow: var(--shadow-sm);
   display: grid;
   place-items: center;
+}
+
+/* Exposure map toggle and legend */
+.ctrl-exposure.is-on {
+  background: var(--poor-dot);
+  color: #fff;
+}
+
+.exposure-card {
+  width: 248px;
+}
+
+.exposure-legend-label {
+  margin: 6px 0 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.exposure-roads {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.exposure-roads li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exposure-road {
+  flex: none;
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.exposure-road-highway { background: #B42324; color: #B42324; }
+.exposure-road-main { background: #E24B4A; color: #E24B4A; }
+.exposure-road-secondary {
+  height: 3px;
+  background: #F08A5D;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.exposure-heat-bar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(253, 230, 138, 0.6), #F59E0B, #E24B4A, #B42324);
+}
+
+.exposure-heat-range {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* ---------- Chat ---------- */
@@ -1536,7 +1791,8 @@ dd {
   }
 
   .air-card,
-  .weather-card {
+  .weather-card,
+  .exposure-card {
     width: 100%;
   }
 

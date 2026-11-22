@@ -3,7 +3,8 @@
 import { useEffect } from "react"
 import { celebrate } from "@/lib/confetti"
 import { format1, type Mode } from "@/data/mock"
-import { gasolineLitres, phoneCharges, treeDays } from "@/lib/impact"
+import { useAccount } from "@/lib/account"
+import { CAR_KG_PER_KM, gasolineLitres, phoneCharges, treeDays } from "@/lib/impact"
 import type { RouteId } from "@/lib/routing"
 
 type ImpactCardProps = {
@@ -16,6 +17,11 @@ type ImpactCardProps = {
 }
 
 export function ImpactCard({ mode, km, route, kg, sessionKg, onDone }: ImpactCardProps) {
+  const account = useAccount()
+  const total = account.signedIn
+    ? `${account.name}, your total: ${format1(account.co2Kg)} kg across ${account.trips} ${account.trips === 1 ? "trip" : "trips"}.`
+    : `Total this session: ${format1(sessionKg)} kg.`
+
   useEffect(() => {
     celebrate()
   }, [])
@@ -50,7 +56,7 @@ export function ImpactCard({ mode, km, route, kg, sessionKg, onDone }: ImpactCar
         </div>
       </div>
       <p className="impact-foot">
-        Total this session: {format1(sessionKg)} kg. Estimates: an average car emits 0.17 kg CO₂ per km, a phone
+        {total} Estimates: an average car emits {CAR_KG_PER_KM} kg CO₂ per km, a phone
         charge about 8 g, a mature tree absorbs about 22 kg a year, and gasoline releases about 2.3 kg per litre.
         Walking and biking produce no tailpipe emissions.
       </p>

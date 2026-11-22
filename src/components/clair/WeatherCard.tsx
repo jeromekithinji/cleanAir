@@ -23,12 +23,8 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
   const feels = live?.feelsC == null ? null : Math.round(live.feelsC)
   const wind = live?.windKmh == null ? null : Math.round(live.windKmh)
   const hotter = temp != null && feels != null && feels - temp >= 3
-  const source =
-    live?.weatherSource === "live"
-      ? "Open-Meteo · live"
-      : live?.weatherSource === "stored"
-        ? "Open-Meteo · Montréal"
-        : "Weather unavailable"
+  const place = live?.weatherSource === "unavailable" ? "Weather unavailable" : "Montréal"
+  const source = live?.weatherSource === "live" ? "Source: Open-Meteo · live" : "Source: Open-Meteo"
   return (
     <section className={`widget weather-card${open ? " is-open" : ""}`} aria-label="Weather and timing">
       <div className="widget-head">
@@ -44,7 +40,7 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
           {open ? <ChevronDownIcon size={20} /> : <ChevronUpIcon size={20} />}
         </button>
       </div>
-      <p className="widget-sub">{live ? source : "Loading the latest forecast…"}</p>
+      <p className="widget-sub">{live ? place : "Loading the latest forecast…"}</p>
       <p className="weather-advice">
         {level === "unknown" ? "Waiting for a live reading" : weatherAdvice(level)}
       </p>
@@ -95,9 +91,12 @@ export function WeatherCard({ live, open, onToggle }: WeatherCardProps) {
               Heat warning in effect today
             </p>
           )}
-          {live.weatherUpdatedLabel ? (
-            <p className="widget-updated">Last updated {live.weatherUpdatedLabel}</p>
-          ) : null}
+          <div className="widget-footer">
+            <p className="widget-updated">
+              {live.weatherUpdatedLabel ? `Last updated ${live.weatherUpdatedLabel}` : ""}
+            </p>
+            {live.weatherSource !== "unavailable" ? <p className="widget-source">{source}</p> : null}
+          </div>
         </>
       )}
     </section>
