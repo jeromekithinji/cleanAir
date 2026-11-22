@@ -9,6 +9,8 @@ type RouteCardProps = {
   showBusy: boolean
 }
 
+const LEVEL_LABEL = { low: "Low", medium: "Medium", high: "High" } as const
+
 /** Time spent on busy roads, e.g. "2 min in busy areas". */
 function busyTime(route: RouteOption): string {
   if (route.busy <= 0) return "no busy areas"

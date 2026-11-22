@@ -17,6 +17,7 @@ import { placeAt } from "@/lib/geocode-place"
 import type { HeatGrid } from "@/lib/heat-grid"
 import { toScenario, type LiveConditions } from "@/lib/live-view"
 import { answerMessage } from "@/lib/clair-assistant"
+import { addTrip } from "@/lib/account"
 import { kgSaved } from "@/lib/impact"
 import { formatMinutes, pairFromResponse, type RouteId, type RoutePair } from "@/lib/routing"
 import type { Sensitivity } from "@/lib/types"
@@ -423,9 +424,11 @@ export function App() {
       return
     }
     const route = routes[selected]
-    const kg = kgSaved(route.km)
+    // Same figure as the route card: driving this distance, from the backend (251 g/km).
+    const kg = route.drivingCo2g != null ? route.drivingCo2g / 1000 : kgSaved(route.km)
     setTrip({ mode, km: route.km, route: selected, kg })
     setSessionKg((total) => total + kg)
+    addTrip(route.km, kg)
     setTripActive(false)
     setModal("impact")
   }
@@ -504,6 +507,11 @@ export function App() {
         accountOpen={accountOpen}
         onAccountToggle={() => setAccountOpen((open) => !open)}
         onAccountClose={() => setAccountOpen(false)}
+        onSignedOut={() => {
+          // Signing out forgets what this page knows about the person.
+          setHealth(EMPTY_HEALTH)
+          setSessionKg(0)
+        }}
       />
 
       {panelVisible && (

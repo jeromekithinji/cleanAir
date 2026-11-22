@@ -56,7 +56,7 @@ export function DirectionsPanel(props: DirectionsPanelProps) {
             <RouteCard route={routes.fast} selected={selected === "fast"} onSelect={() => props.onSelect("fast")} showBusy={mode === "bike"} />
             <RouteCard route={routes.clean} selected={selected === "clean"} onSelect={() => props.onSelect("clean")} showBusy={mode === "bike"} />
           </div>
-          <p className="tradeoff">{props.tradeoff}</p>
+          {selected === "clean" && props.tradeoff ? <p className="tradeoff">{props.tradeoff}</p> : null}
           {props.suggestMetro ? (
             <p className="air-line air-poor">Air is poor, so the metro is a better trip today.</p>
           ) : null}
@@ -67,7 +67,7 @@ export function DirectionsPanel(props: DirectionsPanelProps) {
               ))}
             </ul>
           ) : null}
-          <button type="button" className="btn-primary" onClick={props.onTrip}>
+          <button type="button" className="btn-primary trip-btn" onClick={props.onTrip}>
             {props.tripActive ? "Finish trip" : "Start trip"}
           </button>
         </>
