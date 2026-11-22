@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { celebrate } from "@/lib/confetti"
 import { format1, type Mode } from "@/data/mock"
-import { gasolineLitres, phoneCharges, treeDays } from "@/lib/impact"
+import { CAR_KG_PER_KM, gasolineLitres, phoneCharges, treeDays } from "@/lib/impact"
 import type { RouteId } from "@/lib/routing"
 
 type ImpactCardProps = {
@@ -50,7 +50,7 @@ export function ImpactCard({ mode, km, route, kg, sessionKg, onDone }: ImpactCar
         </div>
       </div>
       <p className="impact-foot">
-        Total this session: {format1(sessionKg)} kg. Estimates: an average car emits 0.17 kg CO₂ per km, a phone
+        Total this session: {format1(sessionKg)} kg. Estimates: an average car emits {CAR_KG_PER_KM} kg CO₂ per km, a phone
         charge about 8 g, a mature tree absorbs about 22 kg a year, and gasoline releases about 2.3 kg per litre.
         Walking and biking produce no tailpipe emissions.
       </p>

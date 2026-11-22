@@ -398,7 +398,8 @@ export function App() {
       return
     }
     const route = routes[selected]
-    const kg = kgSaved(route.km)
+    // Same number as the route card: the backend's driving CO₂ for this route.
+    const kg = route.drivingCo2g != null ? route.drivingCo2g / 1000 : kgSaved(route.km)
     setTrip({ mode, km: route.km, route: selected, kg })
     setSessionKg((total) => total + kg)
     setTripActive(false)
