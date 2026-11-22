@@ -10,6 +10,7 @@ import {
   levelLabel,
   LEVEL_LABEL,
 } from "@/data/mock"
+import { CAR_KG_PER_KM } from "@/lib/impact"
 import { buildRoutes, formatMinutes, tradeoffLine, routeExplanations } from "@/lib/routing"
 
 export type ChatChip = { label: string; message: string }
@@ -101,7 +102,7 @@ export function answerMessage(raw: string, ctx: AssistantContext): AssistantRepl
 
   if (/\b(co2|co₂|carbon|emission)\b/.test(q)) {
     return {
-      text: "We compare your trip with driving the same distance, using 0.17 kg CO₂ per km. Walking and biking produce no tailpipe emissions.",
+      text: `We compare your trip with driving the same distance, using ${CAR_KG_PER_KM} kg CO₂ per km. Walking and biking produce no tailpipe emissions.`,
     }
   }
 
