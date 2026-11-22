@@ -1,5 +1,5 @@
-import { MapScreen } from "@/components/map-screen"
+import { App } from "@/components/clair/App"
 
 export default function Home() {
-  return <MapScreen />
+  return <App />
 }

@@ -28,12 +28,17 @@ Suggested tables:
 
 Load the station list once. Each hourly run replaces the latest reading
 per station. Do not commit the sqlite file or the CSVs.
+
+Each run also writes the same data to backend/data/air.json
+(every station with its latest reading), for reading without sqlite.
 """
 
 import csv
 import io
+import json
 import math
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -209,12 +214,69 @@ async def nearest_station(lat: float, lon: float) -> AirResponse:
     )
 
 
+def export_json(db: sqlite3.Connection, path: Path) -> None:
+    """Write the stations and their latest reading to one JSON file.
+
+    Same data as the sqlite tables, for reading without sqlite
+    (e.g. the AI feature). Shape:
+    {"downloaded_at", "stations": [{"station_id", "name", "neighbourhood",
+     "latitude", "longitude",
+     "reading": {"iqa", "level", "pollutant", "observed_at"} or null}]}
+    """
+    rows = db.execute(
+        """
+        SELECT s.station_id, s.name, s.neighbourhood, s.latitude, s.longitude,
+               r.iqa, r.pollutant, r.observed_at
+        FROM stations s
+        LEFT JOIN readings r ON r.station_id = s.station_id
+        ORDER BY s.station_id
+        """
+    ).fetchall()
+    stations = []
+    for station_id, name, neighbourhood, lat, lon, iqa, pollutant, observed_at in rows:
+        reading = None
+        if iqa is not None:
+            reading = {
+                "iqa": iqa,
+                "level": level_for(iqa).value,
+                "pollutant": pollutant,
+                "observed_at": observed_at,
+            }
+        stations.append(
+            {
+                "station_id": station_id,
+                "name": name,
+                "neighbourhood": neighbourhood,
+                "latitude": lat,
+                "longitude": lon,
+                "reading": reading,
+            }
+        )
+    path.write_text(
+        json.dumps(
+            {
+                "downloaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "stations": stations,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def download_latest() -> None:
     database = get_settings().air_database
+    json_path = database.with_name("air.json")
     with connect(database) as db:
         stations = save_stations(db)
         readings = save_readings(db)
-    print(f"Saved {stations} open stations and {readings} readings to {database}")
+        db.commit()
+        export_json(db, json_path)
+    print(
+        f"Saved {stations} open stations and {readings} readings to {database}\n"
+        f"Wrote the same data to {json_path}"
+    )
 
 
 if __name__ == "__main__":
