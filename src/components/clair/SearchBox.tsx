@@ -200,7 +200,7 @@ export function SearchBox(props: SearchBoxProps) {
                 </button>
               </li>
             ) : (
-              <li key={`${option.hit.lng},${option.hit.lat},${option.hit.name}`} role="option" aria-selected={index === active}>
+              <li key={`place-${index}-${option.hit.lng},${option.hit.lat},${option.hit.name}`} role="option" aria-selected={index === active}>
                 <button
                   type="button"
                   tabIndex={-1}

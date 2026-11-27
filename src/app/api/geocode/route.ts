@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       return NextResponse.json([] satisfies GeocodeHit[])
     }
     const body = (await response.json()) as { features?: PhotonFeature[] }
-    const hits = (body.features ?? []).flatMap(toHit).slice(0, 5)
+    const hits = uniqueHits((body.features ?? []).flatMap(toHit)).slice(0, 5)
     return NextResponse.json(hits)
   } catch {
     return NextResponse.json([] satisfies GeocodeHit[])
@@ -71,4 +71,17 @@ function toHit(feature: PhotonFeature): GeocodeHit[] {
       lng,
     },
   ]
+}
+
+/** Photon sometimes returns the same place more than once. */
+function uniqueHits(hits: GeocodeHit[]): GeocodeHit[] {
+  const seen = new Set<string>()
+  return hits.filter((hit) => {
+    const key = `${hit.lng},${hit.lat},${hit.name}`
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
 }

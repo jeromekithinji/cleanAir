@@ -825,9 +825,33 @@ dd {
   font-weight: 700;
 }
 
-/* Start / Finish trip: always a gap above, whether or not the tradeoff line shows. */
+/* Start trip, then a fill while the demo walk runs, then End trip. */
 .trip-btn {
+  position: relative;
+  overflow: hidden;
   margin-top: 12px;
+}
+
+.trip-btn-label {
+  position: relative;
+  z-index: 1;
+}
+
+.trip-btn.is-progress {
+  background: #e4efe9;
+  color: #10201a;
+  cursor: default;
+}
+
+.trip-btn.is-progress::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--trip-progress, 0%);
+  background: #6fae8c;
+  transition: width 150ms linear;
 }
 
 .why {
