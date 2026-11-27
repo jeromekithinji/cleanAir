@@ -1507,8 +1507,9 @@ dd {
 .welcome-title {
   margin-top: 18px;
   font-family: var(--serif);
+  font-style: normal;
   font-weight: 400;
-  font-size: clamp(24px, 6vw, 29px);
+  font-size: clamp(20px, 5vw, 24px);
   line-height: 1.15;
   text-align: center;
 }

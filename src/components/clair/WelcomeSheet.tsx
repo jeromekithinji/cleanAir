@@ -13,7 +13,7 @@ export function WelcomeSheet({ onAddHealth, onSkip }: WelcomeSheetProps) {
       <Logo size={104} leaf="#fff" className="welcome-logo" />
       <div className="welcome-name">{APP_NAME}</div>
       <h1 id="clair-welcome-title" className="welcome-title">
-        Routes that go easy on your lungs
+        Get there with your health in mind
       </h1>
       <p className="welcome-sub">
         Add your health info and we&apos;ll plan walking and biking routes that avoid busy, polluted roads.
