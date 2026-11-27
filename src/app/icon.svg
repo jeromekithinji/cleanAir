@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+  <style>
+    .pin { fill: #3B6255; }
+    .leaf { fill: #E2DFDA; }
+    .vein { stroke: #3B6255; }
+    @media (prefers-color-scheme: dark) {
+      .pin { fill: #8BA49A; }
+      .leaf { fill: #1E2623; }
+      .vein { stroke: #8BA49A; }
+    }
+  </style>
+  <path class="pin" d="M40 76C40 76 14 50 14 32A26 26 0 0 1 66 32C66 50 40 76 40 76Z" />
+  <path class="leaf" d="M28 42C28 27 43 22 53 24C53 37 46 46 28 42Z" />
+  <path class="vein" d="M28 42L40 31" stroke-width="2.5" stroke-linecap="round" fill="none" />
+</svg>
