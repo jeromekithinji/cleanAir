@@ -137,7 +137,6 @@ function userDot(): HTMLDivElement {
 }
 
 // ---------- Exposure map ----------
-
 const EXPOSURE_LAYERS = ["exposure-heat", "exposure-roads-glow", "exposure-roads"]
 /**
  * The road types routing.py counts as busy, coloured from highway to secondary.

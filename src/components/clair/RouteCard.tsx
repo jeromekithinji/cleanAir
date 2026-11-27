@@ -31,6 +31,7 @@ export function RouteCard({ route, selected, onSelect, showBusy }: RouteCardProp
       </span>
       <span className="route-card-line">
         {format1(route.km)} km{showBusy ? ` · ${busyTime(route)}` : ""}
+        {route.shadePct != null ? ` · ${Math.round(route.shadePct)}% shaded` : ""}
         {route.id === "fast" ? "" : " · best route"}
       </span>
       <span className="route-card-line">

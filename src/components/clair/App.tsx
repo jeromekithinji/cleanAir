@@ -12,7 +12,7 @@ import {
   type Place,
   type Scenario,
 } from "@/data/mock"
-import { planRoutes } from "@/lib/api"
+import { planHealthRoutes } from "@/lib/api"
 import { placeAt } from "@/lib/geocode-place"
 import type { HeatGrid } from "@/lib/heat-grid"
 import { SAMPLE_PLACES } from "@/lib/sample-trip"
@@ -31,7 +31,7 @@ import { formatMinutes, pairFromResponse, type RouteId, type RoutePair } from "@
 import type { Sensitivity } from "@/lib/types"
 import { AirQualityCard } from "./AirQualityCard"
 import { ChatAssistant, type ChatMessage } from "./ChatAssistant"
-import { DirectionsPanel } from "./DirectionsPanel"
+import { DirectionsPanel, type TripPhase } from "./DirectionsPanel"
 import { ExposureCard } from "./ExposureCard"
 import { HealthForm } from "./HealthForm"
 import { ImpactCard } from "./ImpactCard"
@@ -135,6 +135,13 @@ export function App() {
   const [modal, setModal] = useState<ModalState>("welcome")
   const [welcomeDone, setWelcomeDone] = useState(false)
   const [health, setHealth] = useState<Health>(EMPTY_HEALTH)
+  const routeMeta = useRef({
+    tunedFor: [] as string[],
+    advisory: null as string | null,
+    healthCost: null as number | null,
+    busyMinutes: null as { fast: number; clean: number } | null,
+    shadePct: null as { fast: number | null; clean: number | null } | null,
+  })
   const [live, setLive] = useState<LiveConditions | null>(null)
   const [mode, setMode] = useState<Mode>("walk")
 
@@ -154,7 +161,8 @@ export function App() {
   const [routesLoading, setRoutesLoading] = useState(false)
   const [routeError, setRouteError] = useState<string | null>(null)
   const [selected, setSelected] = useState<RouteId>("clean")
-  const [tripActive, setTripActive] = useState(false)
+  const [tripPhase, setTripPhase] = useState<TripPhase>("idle")
+  const [tripProgress, setTripProgress] = useState(0)
   const [trip, setTrip] = useState<Trip | null>(null)
   const [sessionKg, setSessionKg] = useState(0)
 
@@ -322,6 +330,13 @@ export function App() {
       setSuggestMetro(false)
       setRouteError(null)
       setRoutesLoading(false)
+      routeMeta.current = {
+        tunedFor: [],
+        advisory: null,
+        healthCost: null,
+        busyMinutes: null,
+        shadePct: null,
+      }
       return
     }
     const controller = new AbortController()
@@ -331,7 +346,7 @@ export function App() {
     setSuggestMetro(false)
     setRouteError(null)
     setRoutesLoading(true)
-    planRoutes(
+    planHealthRoutes(
       { label: start.name, lat: start.lat, lon: start.lon },
       { label: dest.name, lat: dest.lat, lon: dest.lon },
       {
@@ -339,9 +354,11 @@ export function App() {
         copd: sensitivity(health.copd),
         heat: sensitivity(health.heat),
         mode,
+        extraMinutesOk: health.extraMinutesOk ?? 10,
       },
-      false,
       airKnown ? airLevel : undefined,
+      live?.feelsC ?? null,
+      live?.heatWarning ?? false,
       controller.signal,
     )
       .then((response) => {
@@ -350,6 +367,19 @@ export function App() {
         setTradeoff(planned.tradeoff)
         setExplanations(planned.explanations)
         setSuggestMetro(planned.suggestMetro)
+        routeMeta.current = {
+          tunedFor: planned.tunedFor,
+          advisory: planned.advisory,
+          healthCost: planned.healthCost,
+          busyMinutes: {
+            fast: planned.routes.fast.busyMinutes ?? 0,
+            clean: planned.routes.clean.busyMinutes ?? 0,
+          },
+          shadePct: {
+            fast: planned.routes.fast.shadePct ?? null,
+            clean: planned.routes.clean.shadePct ?? null,
+          },
+        }
         setRoutesLoading(false)
       })
       .catch((error: unknown) => {
@@ -364,7 +394,7 @@ export function App() {
         setRoutesLoading(false)
       })
     return () => controller.abort()
-  }, [start, dest, mode, health, airKnown, airLevel])
+  }, [start, dest, mode, health, airKnown, airLevel, live?.feelsC, live?.heatWarning])
 
   // New pair of routes: fit the camera around both.
   useEffect(() => {
@@ -389,6 +419,12 @@ export function App() {
     return () => cancelAnimationFrame(frame)
     // Only when the geometry changes, not on every minute or selection change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey])
+
+  // A new route cancels an in-progress demo trip.
+  useEffect(() => {
+    setTripPhase("idle")
+    setTripProgress(0)
   }, [routeKey])
 
   // Escape closes the top-most dismissable layer.
@@ -418,7 +454,8 @@ export function App() {
       setTwoFields(true)
       setSwapped(false)
       setSelected("clean")
-      setTripActive(false)
+      setTripPhase("idle")
+    setTripProgress(0)
       if (!start && gpsPlace.current) {
         setStart(gpsPlace.current)
         setStartText(gpsPlace.current.name)
@@ -433,7 +470,8 @@ export function App() {
     setStartText(place.name)
     setSwapped(false)
     setSelected("clean")
-    setTripActive(false)
+    setTripPhase("idle")
+    setTripProgress(0)
   }
 
   const swap = () => {
@@ -443,7 +481,8 @@ export function App() {
     setDestText(startText)
     setSwapped(true)
     setSelected("clean")
-    setTripActive(false)
+    setTripPhase("idle")
+    setTripProgress(0)
   }
 
   const clear = () => {
@@ -454,17 +493,54 @@ export function App() {
     setStartText(gpsPlace.current?.name ?? "")
     setTwoFields(false)
     setSwapped(false)
-    setTripActive(false)
+    setTripPhase("idle")
+    setTripProgress(0)
     setSelected("clean")
     mapRef.current?.reset()
   }
 
-  const onTrip = () => {
-    if (!routes) {
+  const chooseRoute = (id: RouteId) => {
+    if (id !== selected) {
+      setTripPhase("idle")
+      setTripProgress(0)
+    }
+    setSelected(id)
+  }
+
+  const changeMode = (next: Mode) => {
+    setTripPhase("idle")
+    setTripProgress(0)
+    setMode(next)
+  }
+
+  // Demo trip: fill the Start trip button over 8 seconds, then show End trip.
+  useEffect(() => {
+    if (tripPhase !== "walking") {
       return
     }
-    if (!tripActive) {
-      setTripActive(true)
+    const durationMs = 8_000
+    const started = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / durationMs)
+      setTripProgress(progress)
+      if (progress < 1) {
+        frame = requestAnimationFrame(tick)
+        return
+      }
+      setTripPhase("arrived")
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [tripPhase])
+
+  const onTrip = () => {
+    if (!routes || tripPhase === "walking") {
+      return
+    }
+    if (tripPhase === "idle") {
+      setTripProgress(0)
+      setTripPhase("walking")
       return
     }
     const route = routes[selected]
@@ -473,7 +549,8 @@ export function App() {
     setTrip({ mode, km: route.km, route: selected, kg })
     setSessionKg((total) => total + kg)
     addTrip(route.km, kg)
-    setTripActive(false)
+    setTripPhase("idle")
+    setTripProgress(0)
     setModal("impact")
   }
 
@@ -488,8 +565,9 @@ export function App() {
       durationSeconds: route.minutes * 60,
       distanceMeters: Math.round(route.km * 1000),
       busyShare: route.busy,
+      busyMinutes: route.busyMinutes ?? null,
       mainStreets: null,
-      shadeShare: null,
+      shadeShare: route.shadePct == null ? null : route.shadePct / 100,
     })
     return {
       origin: { label: origin.name, lat: origin.lat, lon: origin.lon },
@@ -498,6 +576,11 @@ export function App() {
       strictMode: airLevel === "poor",
       tradeoff,
       routes: [pack(routes.fast), pack(routes.clean)],
+      tunedFor: routeMeta.current.tunedFor,
+      advisory: routeMeta.current.advisory,
+      healthCost: routeMeta.current.healthCost,
+      busyMinutes: routeMeta.current.busyMinutes,
+      shadePct: routeMeta.current.shadePct,
     }
   }
 
@@ -532,7 +615,8 @@ export function App() {
     setDestText(destPlace.name)
     setTwoFields(true)
     setSelected("clean")
-    setTripActive(false)
+    setTripPhase("idle")
+    setTripProgress(0)
   }
 
   const send = (text: string, hint?: AssistantHint | null) => {
@@ -567,6 +651,7 @@ export function App() {
           copd: sensitivityOrNull(health.copd),
           heat: sensitivityOrNull(health.heat),
           mode,
+          extraMinutesOk: health.extraMinutesOk ?? 10,
         },
         userLocation: origin
           ? { label: origin.name, lat: origin.lat, lon: origin.lon }
@@ -600,7 +685,7 @@ export function App() {
         if (reply.kind === "directions") {
           applyGroqDirections(reply)
         } else if (reply.parsed.mode) {
-          setMode(reply.parsed.mode)
+          changeMode(reply.parsed.mode)
         }
       })
       .catch(() => {
@@ -621,7 +706,7 @@ export function App() {
           setHealth((current) => ({ ...current, ...local.health }))
         }
         if (local.mode) {
-          setMode(local.mode)
+          changeMode(local.mode)
         }
         if (local.destinationId) {
           planTo(placeById(local.destinationId))
@@ -667,7 +752,7 @@ export function App() {
         routes={routes}
         routeKey={routeKey}
         selected={selected}
-        onSelectRoute={setSelected}
+        onSelectRoute={chooseRoute}
         start={start}
         destination={dest}
         currentLocation={CURRENT_LOCATION}
@@ -721,12 +806,12 @@ export function App() {
           ref={panelRef}
           top={panelTop}
           mode={mode}
-          onMode={setMode}
+          onMode={changeMode}
           airLevel={airLevel}
           airIndex={airKnown ? scenario.index : null}
           routes={routes}
           selected={selected}
-          onSelect={setSelected}
+          onSelect={chooseRoute}
           tradeoff={tradeoff}
           explanations={explanations}
           suggestMetro={suggestMetro}
@@ -737,7 +822,8 @@ export function App() {
               : "Finding the fastest and cleaner routes…"
           }
           error={routeError ?? (!start && !locating ? locationMessage : null)}
-          tripActive={tripActive}
+          tripPhase={tripPhase}
+          tripProgress={tripProgress}
           onTrip={onTrip}
           onClear={clear}
         />

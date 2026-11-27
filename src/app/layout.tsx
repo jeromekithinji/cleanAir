@@ -27,8 +27,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={playfair.variable}>
-      {/* Extensions such as Grammarly add attributes to <body> before React loads. */}
+    <html lang="en" className={playfair.variable} suppressHydrationWarning>
+      {/* Extensions can add attributes to <html>/<body> before React loads. */}
       <body suppressHydrationWarning>{children}</body>
     </html>
   )
